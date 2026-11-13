@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import app from '../app.js'
+import { Hono } from 'hono'
+import realApp from '../app.js'
+import { createTelegramWebhook } from './webhook.js'
+
+const FAIL_TEXT = 'No pude generar una respuesta en este momento. Probá de nuevo en un rato.'
+const NON_TEXT = 'Por ahora solo puedo responder mensajes de texto.'
 
 const TOKEN = '123456:SECRET-TOKEN'
 const SECRET = 'hook-secret'
@@ -13,7 +18,24 @@ const realConsoleError = console.error
 const savedEnv = {
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
+  NEON_AI_GATEWAY_TOKEN: process.env.NEON_AI_GATEWAY_TOKEN,
+  NEON_AI_GATEWAY_BASE_URL: process.env.NEON_AI_GATEWAY_BASE_URL,
 }
+const AI_TOKEN = 'nt_live_SECRET-AI-TOKEN'
+
+type ReplyCall = { text: string; signal: AbortSignal }
+let replyCalls: ReplyCall[]
+let replyImpl: (text: string) => Promise<string>
+
+const app = new Hono().route(
+  '/telegram/webhook',
+  createTelegramWebhook({
+    generateReply: (text, signal) => {
+      replyCalls.push({ text, signal })
+      return replyImpl(text)
+    },
+  }),
+)
 
 let calls: FetchCall[]
 let errorLogs: string[]
@@ -28,6 +50,10 @@ function restoreEnv(name: keyof typeof savedEnv) {
 beforeEach(() => {
   process.env.TELEGRAM_BOT_TOKEN = TOKEN
   process.env.TELEGRAM_WEBHOOK_SECRET = SECRET
+  process.env.NEON_AI_GATEWAY_TOKEN = AI_TOKEN
+  process.env.NEON_AI_GATEWAY_BASE_URL = 'https://example.ai.neon.test'
+  replyCalls = []
+  replyImpl = async () => 'respuesta generada'
   calls = []
   errorLogs = []
   fetchImpl = async () => new Response('{"ok":true}', { status: 200 })
@@ -45,6 +71,8 @@ afterEach(() => {
   console.error = realConsoleError
   restoreEnv('TELEGRAM_BOT_TOKEN')
   restoreEnv('TELEGRAM_WEBHOOK_SECRET')
+  restoreEnv('NEON_AI_GATEWAY_TOKEN')
+  restoreEnv('NEON_AI_GATEWAY_BASE_URL')
 })
 
 const textUpdate = {
@@ -61,31 +89,93 @@ function post(body: unknown, headers: Record<string, string> = { [HEADER]: SECRE
 }
 
 describe('POST /telegram/webhook', () => {
-  it('echoes a text message with copyMessage', async () => {
+  it('replies to a text message with the generated text via sendMessage', async () => {
     const res = await post(textUpdate)
     assert.equal(res.status, 200)
+    assert.equal(replyCalls.length, 1)
+    assert.equal(replyCalls[0].text, 'hola')
     assert.equal(calls.length, 1)
-    assert.equal(calls[0].url, `https://api.telegram.org/bot${TOKEN}/copyMessage`)
+    assert.equal(calls[0].url, `https://api.telegram.org/bot${TOKEN}/sendMessage`)
     assert.equal(calls[0].init?.method, 'POST')
     assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
       chat_id: 777,
-      from_chat_id: 777,
-      message_id: 42,
+      text: 'respuesta generada',
     })
   })
 
-  it('echoes a non-text message (photo) with the same body', async () => {
+  it('answers a non-text message with the fixed text and does not call the model', async () => {
     const res = await post({
       update_id: 2,
       message: { message_id: 43, chat: { id: 888 }, photo: [{ file_id: 'x' }] },
     })
     assert.equal(res.status, 200)
+    assert.equal(replyCalls.length, 0)
     assert.equal(calls.length, 1)
-    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), {
-      chat_id: 888,
-      from_chat_id: 888,
-      message_id: 43,
-    })
+    assert.equal(calls[0].url, `https://api.telegram.org/bot${TOKEN}/sendMessage`)
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { chat_id: 888, text: NON_TEXT })
+  })
+
+  it('treats an empty text as a non-text message', async () => {
+    const res = await post({ update_id: 2, message: { message_id: 43, chat: { id: 888 }, text: '' } })
+    assert.equal(res.status, 200)
+    assert.equal(replyCalls.length, 0)
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { chat_id: 888, text: NON_TEXT })
+  })
+
+  it('sends the fixed failure text when generation throws, without leaking secrets in logs', async () => {
+    replyImpl = async () => {
+      throw Object.assign(new Error(`403 for ${AI_TOKEN} text hola`), { name: 'APICallError' })
+    }
+    const res = await post(textUpdate)
+    assert.equal(res.status, 200)
+    assert.equal(calls.length, 1)
+    assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { chat_id: 777, text: FAIL_TEXT })
+    assert.ok(errorLogs.some((l) => l.includes('APICallError')))
+    for (const l of errorLogs) {
+      assert.ok(!l.includes(TOKEN))
+      assert.ok(!l.includes(AI_TOKEN))
+      assert.ok(!l.includes('hola'))
+    }
+  })
+
+  it('treats empty or whitespace-only generation as a failure', async () => {
+    for (const out of ['', '  \n ']) {
+      calls = []
+      replyImpl = async () => out
+      const res = await post(textUpdate)
+      assert.equal(res.status, 200)
+      assert.equal(calls.length, 1)
+      assert.deepEqual(JSON.parse(String(calls[0].init?.body)), { chat_id: 777, text: FAIL_TEXT })
+    }
+  })
+
+  it('passes an AbortSignal to generateReply', async () => {
+    await post(textUpdate)
+    assert.ok(replyCalls[0].signal instanceof AbortSignal)
+  })
+
+  it('returns 500 and makes no calls when NEON_AI_GATEWAY_TOKEN is missing', async () => {
+    delete process.env.NEON_AI_GATEWAY_TOKEN
+    const res = await post(textUpdate)
+    assert.equal(res.status, 500)
+    assert.equal(calls.length, 0)
+    assert.equal(replyCalls.length, 0)
+  })
+
+  it('returns 500 and makes no calls when NEON_AI_GATEWAY_BASE_URL is missing', async () => {
+    delete process.env.NEON_AI_GATEWAY_BASE_URL
+    const res = await post(textUpdate)
+    assert.equal(res.status, 500)
+    assert.equal(calls.length, 0)
+    assert.equal(replyCalls.length, 0)
+  })
+
+  it('returns 200 and no calls for a non-numeric/non-string chat.id', async () => {
+    const res = await post({ update_id: 7, message: { message_id: 1, chat: { id: { x: 1 } }, text: 'hi' } })
+    assert.equal(res.status, 200)
+    assert.equal(calls.length, 0)
+    assert.equal(replyCalls.length, 0)
+    assert.equal(errorLogs.length, 0)
   })
 
   it('returns 401 without the secret header and does not call the Bot API', async () => {
@@ -120,7 +210,7 @@ describe('POST /telegram/webhook', () => {
     assert.equal(calls.length, 0)
   })
 
-  it('returns 200 when copyMessage responds non-OK and logs without the token', async () => {
+  it('returns 200 when sendMessage responds non-OK and logs without the token', async () => {
     fetchImpl = async () => new Response('{"ok":false}', { status: 400 })
     const res = await post(textUpdate)
     assert.equal(res.status, 200)
@@ -131,7 +221,7 @@ describe('POST /telegram/webhook', () => {
 
   it('returns 200 when fetch throws and logs without the token', async () => {
     fetchImpl = async () => {
-      throw new Error(`network down for https://api.telegram.org/bot${TOKEN}/copyMessage`)
+      throw new Error(`network down for https://api.telegram.org/bot${TOKEN}/sendMessage`)
     }
     const res = await post(textUpdate)
     assert.equal(res.status, 200)
@@ -178,9 +268,9 @@ describe('POST /telegram/webhook', () => {
     assert.equal(errorLogs.length, 0)
   })
 
-  it('S1: copyMessage is called with an AbortSignal and a timeout is logged without the token', async () => {
+  it('S1: sendMessage is called with an AbortSignal and a timeout is logged without the token', async () => {
     fetchImpl = async () => {
-      throw new DOMException(`timed out calling https://api.telegram.org/bot${TOKEN}/copyMessage`, 'TimeoutError')
+      throw new DOMException(`timed out calling https://api.telegram.org/bot${TOKEN}/sendMessage`, 'TimeoutError')
     }
     const res = await post(textUpdate)
     assert.equal(res.status, 200)
@@ -199,7 +289,7 @@ describe('POST /telegram/webhook', () => {
 
 describe('GET /', () => {
   it('still returns Hello Hono!', async () => {
-    const res = await app.request('/')
+    const res = await realApp.request('/')
     assert.equal(res.status, 200)
     assert.equal(await res.text(), 'Hello Hono!')
   })

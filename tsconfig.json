@@ -13,5 +13,5 @@
     "rootDir": "./src",
     "outDir": "./dist"
   },
-  "exclude": ["node_modules", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "neon.ts", "src/**/*.test.ts"]
 }
