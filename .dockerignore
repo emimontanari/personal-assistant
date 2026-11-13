@@ -2,6 +2,7 @@
 .agents/
 .atl/
 .pi/
+.firecrawl/
 skills-lock.json
 
 # dependencies and build output (rebuilt inside the image)

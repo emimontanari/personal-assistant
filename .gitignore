@@ -30,3 +30,4 @@ lerna-debug.log*
 # railway agent tooling (local only)
 .agents/
 .pi/mcp.json
+.firecrawl/
