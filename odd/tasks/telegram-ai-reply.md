@@ -22,7 +22,7 @@ Branch: `feat/telegram-ai-reply`. Base: `odd/tasks/telegram-echo-webhook.md` (se
 
 - T1 — S1, S2, S3 — writer `gentle-ai-worker` — instalar `@neon/ai-sdk-provider` (+ `zod`), reescribir el webhook con inyección de dependencias para tests, tests, `neon.ts` — commit: 2245455 (26/26 tests; tsconfig excluye neon.ts)
 - T2 — S1, S2 — writer `gentle-ai-worker` — README y AGENTS.md: comportamiento nuevo, variables, modelo — commit: e6390bc
-- T3 — S1, S2 — writer `gentle-ai-worker` — cambiar provider Neon → OpenAI (`@ai-sdk/openai`), `OPENAI_API_KEY`, menor esfuerzo de razonamiento, tests, docs, `neon.ts` — commit: 466b22e (27/27 tests)
+- T3 — S1, S2 — writer `gentle-ai-worker` — cambiar provider Neon → OpenAI (`@ai-sdk/openai`), `OPENAI_API_KEY`, menor esfuerzo de razonamiento, tests, docs, `neon.ts` — commit: b9e3e50 (27/27 tests)
 
 ## Log
 
@@ -37,3 +37,4 @@ Branch: `feat/telegram-ai-reply`. Base: `odd/tasks/telegram-echo-webhook.md` (se
 - **L4** — Verify independiente (Risk items 2, 5): S1, S2, S3 cumplidos; build + runtime con Node OK (200/401/500); 0 vulnerabilidades (`npm audit --omit=dev`). Advisories: no hay test que fije los valores 25 s / 10 s; el 403 real del gateway solo se probó con mock.
 - **L5** — Review nativa RDD `review-bc259e053efd0e8e` (risk, resilience, reliability) sobre `main..6f07053`: **approved**, autoridad quemada. Advisories no bloqueantes: WARNING `R1-unmetered-paid-generation` (cualquiera que escriba al bot consume créditos, sin límite ni allowlist); WARNING `R3-tg-4096-limit` / `R4-reply-length-unbounded` (respuestas > 4096 caracteres hacen fallar `sendMessage`); WARNING `R3-weak-abort-and-timeout-tests`; SUGGESTION sobre peso de dependencias y wiring de rutas sin test.
 - **L6** (usuario, verbatim): "Acá quiero que me ayudes con una cosa, porque al final no voy a cargar créditos en Neon, sino que tengo en OpenEI. ¿Qué tengo que usar? ¿Versar el SDK y conectarlo con OpenEI? ¿Cómo se tendría que hacer ahí?" → luego: "si hacelo por que ya tengo la apikey cargado en el env, siempre con el modelo mas barato posible". Reabre S1 (modelo) y S2 (proveedor) → T3.
+- **L7** — Verify independiente del cambio a OpenAI (b9e3e50): S1, S2, S3 cumplidos; 27/27; runtime Node 200/401/500; `@ai-sdk/openai@4.0.117` comparte `@ai-sdk/provider@4.0.38` con `ai@7`; 0 vulnerabilidades. `gpt-5-nano` confirmado como el modelo de texto más barato de OpenAI (models.dev). Con un `AI_MODEL` no razonador, el provider descarta `reasoningEffort` con un warning (no falla). Sin llamada real a OpenAI.
