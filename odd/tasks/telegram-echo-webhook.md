@@ -20,7 +20,7 @@ Branch: `feat/telegram-echo-webhook`. Investigación de la API: Firecrawl (`.fir
 ## Tasks
 
 - T1 — S1, S2 — writer `gentle-ai-worker` — ruta, verificación de secret, eco con `copyMessage`, tests (`node:test` + `tsx`, `fetch` mockeado), script `npm test` — commit: 3cf166a (done: 11/11 tests; `invalid JSON` → 400 elegido por el writer)
-- T2 — S3 — writer `gentle-ai-worker` — README: variables, registro de webhook, prueba con Hono CLI — commit: pending
+- T2 — S3 — writer `gentle-ai-worker` — README: variables, registro de webhook, prueba con Hono CLI — commit: 4518510 (done; verify: S1-S3 met, regression tests added)
 
 ## Log
 

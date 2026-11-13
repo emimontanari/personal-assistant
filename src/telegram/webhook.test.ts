@@ -144,6 +144,36 @@ describe('POST /telegram/webhook', () => {
     assert.equal(res.status, 400)
     assert.equal(calls.length, 0)
   })
+
+  it('S2: returns 401 for a same-length wrong secret, no Bot API call', async () => {
+    const wrong = SECRET.slice(0, -1) + (SECRET.endsWith('x') ? 'y' : 'x')
+    assert.equal(wrong.length, SECRET.length)
+    assert.notEqual(wrong, SECRET)
+    const res = await post(textUpdate, { [HEADER]: wrong })
+    assert.equal(res.status, 401)
+    assert.equal(calls.length, 0)
+  })
+
+  it('S2: 500 response and logs never contain the token', async () => {
+    delete process.env.TELEGRAM_WEBHOOK_SECRET
+    const res = await post(textUpdate)
+    assert.equal(res.status, 500)
+    assert.ok(!(await res.text()).includes(TOKEN))
+    for (const l of errorLogs) assert.ok(!l.includes(TOKEN))
+  })
+
+  it('S1: message without chat returns 200, never reaches the Bot API and does not leak the token', async () => {
+    const res = await post({ update_id: 5, message: { message_id: 1 } })
+    assert.equal(res.status, 200)
+    assert.equal(calls.length, 0)
+    for (const l of errorLogs) assert.ok(!l.includes(TOKEN))
+  })
+
+  it('S1: JSON null body returns 200 without calling the Bot API', async () => {
+    const res = await post('null')
+    assert.equal(res.status, 200)
+    assert.equal(calls.length, 0)
+  })
 })
 
 describe('GET /', () => {
