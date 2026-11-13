@@ -1,0 +1,31 @@
+# agent tooling (local only, not part of the deployment)
+.agents/
+.atl/
+.pi/
+skills-lock.json
+
+# dependencies and build output (rebuilt inside the image)
+node_modules/
+dist/
+
+# secrets
+.env
+.env.*
+
+# version control
+.git/
+.gitignore
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+
+# logs
+logs/
+*.log
+
+# docs and docker files
+README.md
+Dockerfile*
+.dockerignore

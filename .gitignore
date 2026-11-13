@@ -26,3 +26,7 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+
+# railway agent tooling (local only)
+.agents/
+.pi/mcp.json
