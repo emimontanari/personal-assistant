@@ -162,10 +162,31 @@ describe('POST /telegram/webhook', () => {
     for (const l of errorLogs) assert.ok(!l.includes(TOKEN))
   })
 
-  it('S1: message without chat returns 200, never reaches the Bot API and does not leak the token', async () => {
+  it('S1: message without chat returns 200, no Bot API call and no error log', async () => {
     const res = await post({ update_id: 5, message: { message_id: 1 } })
     assert.equal(res.status, 200)
     assert.equal(calls.length, 0)
+    assert.equal(errorLogs.length, 0)
+  })
+
+  it('S1: message with chat but non-numeric message_id returns 200, no Bot API call', async () => {
+    for (const message of [{ chat: { id: 1 } }, { message_id: 'abc', chat: { id: 1 } }]) {
+      const res = await post({ update_id: 6, message })
+      assert.equal(res.status, 200)
+    }
+    assert.equal(calls.length, 0)
+    assert.equal(errorLogs.length, 0)
+  })
+
+  it('S1: copyMessage is called with an AbortSignal and a timeout is logged without the token', async () => {
+    fetchImpl = async () => {
+      throw new DOMException(`timed out calling https://api.telegram.org/bot${TOKEN}/copyMessage`, 'TimeoutError')
+    }
+    const res = await post(textUpdate)
+    assert.equal(res.status, 200)
+    assert.equal(calls.length, 1)
+    assert.ok(calls[0].init?.signal instanceof AbortSignal)
+    assert.ok(errorLogs.some((l) => l.includes('TimeoutError')))
     for (const l of errorLogs) assert.ok(!l.includes(TOKEN))
   })
 
