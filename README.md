@@ -44,7 +44,7 @@ Si cambiás el secreto, ejecutá `setWebhook` de nuevo.
 
 ```bash
 npm install
-npm run dev   # servidor en http://localhost:3000
+npm run dev   # servidor en http://localhost:3000 (usa PORT si está definido; Railway lo inyecta)
 npm test
 ```
 
