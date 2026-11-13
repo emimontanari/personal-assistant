@@ -33,12 +33,7 @@ export function createTelegramWebhook({
   telegram.post('/', async (c) => {
     const token = process.env.TELEGRAM_BOT_TOKEN
     const secret = process.env.TELEGRAM_WEBHOOK_SECRET
-    if (
-      !token ||
-      !secret ||
-      !process.env.NEON_AI_GATEWAY_TOKEN ||
-      !process.env.NEON_AI_GATEWAY_BASE_URL
-    ) {
+    if (!token || !secret || !process.env.OPENAI_API_KEY) {
       console.error('Telegram webhook is not configured')
       return c.text('Server misconfigured', 500)
     }

@@ -18,10 +18,9 @@ const realConsoleError = console.error
 const savedEnv = {
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
   TELEGRAM_WEBHOOK_SECRET: process.env.TELEGRAM_WEBHOOK_SECRET,
-  NEON_AI_GATEWAY_TOKEN: process.env.NEON_AI_GATEWAY_TOKEN,
-  NEON_AI_GATEWAY_BASE_URL: process.env.NEON_AI_GATEWAY_BASE_URL,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
 }
-const AI_TOKEN = 'nt_live_SECRET-AI-TOKEN'
+const AI_TOKEN = 'sk-proj-SECRET-OPENAI-KEY'
 
 type ReplyCall = { text: string; signal: AbortSignal }
 let replyCalls: ReplyCall[]
@@ -50,8 +49,7 @@ function restoreEnv(name: keyof typeof savedEnv) {
 beforeEach(() => {
   process.env.TELEGRAM_BOT_TOKEN = TOKEN
   process.env.TELEGRAM_WEBHOOK_SECRET = SECRET
-  process.env.NEON_AI_GATEWAY_TOKEN = AI_TOKEN
-  process.env.NEON_AI_GATEWAY_BASE_URL = 'https://example.ai.neon.test'
+  process.env.OPENAI_API_KEY = AI_TOKEN
   replyCalls = []
   replyImpl = async () => 'respuesta generada'
   calls = []
@@ -71,8 +69,7 @@ afterEach(() => {
   console.error = realConsoleError
   restoreEnv('TELEGRAM_BOT_TOKEN')
   restoreEnv('TELEGRAM_WEBHOOK_SECRET')
-  restoreEnv('NEON_AI_GATEWAY_TOKEN')
-  restoreEnv('NEON_AI_GATEWAY_BASE_URL')
+  restoreEnv('OPENAI_API_KEY')
 })
 
 const textUpdate = {
@@ -154,20 +151,24 @@ describe('POST /telegram/webhook', () => {
     assert.ok(replyCalls[0].signal instanceof AbortSignal)
   })
 
-  it('returns 500 and makes no calls when NEON_AI_GATEWAY_TOKEN is missing', async () => {
-    delete process.env.NEON_AI_GATEWAY_TOKEN
+  it('returns 500 and makes no calls when OPENAI_API_KEY is missing, without logging secrets', async () => {
+    delete process.env.OPENAI_API_KEY
     const res = await post(textUpdate)
     assert.equal(res.status, 500)
     assert.equal(calls.length, 0)
     assert.equal(replyCalls.length, 0)
+    for (const l of errorLogs) {
+      assert.ok(!l.includes(TOKEN))
+      assert.ok(!l.includes(AI_TOKEN))
+    }
   })
 
-  it('returns 500 and makes no calls when NEON_AI_GATEWAY_BASE_URL is missing', async () => {
+  it('does not require the old NEON_AI_GATEWAY_* variables', async () => {
+    delete process.env.NEON_AI_GATEWAY_TOKEN
     delete process.env.NEON_AI_GATEWAY_BASE_URL
     const res = await post(textUpdate)
-    assert.equal(res.status, 500)
-    assert.equal(calls.length, 0)
-    assert.equal(replyCalls.length, 0)
+    assert.equal(res.status, 200)
+    assert.equal(replyCalls.length, 1)
   })
 
   it('returns 200 and no calls for a non-numeric/non-string chat.id', async () => {

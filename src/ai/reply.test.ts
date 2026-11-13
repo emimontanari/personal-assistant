@@ -34,4 +34,10 @@ describe('generateReply', () => {
     await generateReply('hola', ac.signal, model)
     assert.ok(model.doGenerateCalls[0].abortSignal instanceof AbortSignal)
   })
+
+  it('requests the lowest reasoning effort via the openai provider option', async () => {
+    const model = mockModel('x')
+    await generateReply('hola', new AbortController().signal, model)
+    assert.equal(model.doGenerateCalls[0].providerOptions?.openai?.reasoningEffort, 'minimal')
+  })
 })
