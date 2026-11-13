@@ -20,8 +20,8 @@ Branch: `feat/telegram-ai-reply`. Base: `odd/tasks/telegram-echo-webhook.md` (se
 
 ## Tasks
 
-- T1 — S1, S2, S3 — writer `gentle-ai-worker` — instalar `@neon/ai-sdk-provider` (+ `zod`), reescribir el webhook con inyección de dependencias para tests, tests, `neon.ts` — commit: pending
-- T2 — S1, S2 — writer `gentle-ai-worker` — README y AGENTS.md: comportamiento nuevo, variables, modelo — commit: pending
+- T1 — S1, S2, S3 — writer `gentle-ai-worker` — instalar `@neon/ai-sdk-provider` (+ `zod`), reescribir el webhook con inyección de dependencias para tests, tests, `neon.ts` — commit: 2245455 (26/26 tests; tsconfig excluye neon.ts)
+- T2 — S1, S2 — writer `gentle-ai-worker` — README y AGENTS.md: comportamiento nuevo, variables, modelo — commit: e6390bc
 
 ## Log
 
@@ -33,3 +33,4 @@ Branch: `feat/telegram-ai-reply`. Base: `odd/tasks/telegram-echo-webhook.md` (se
   > Utilizá las skills de ai-sdk, hono y neon.
 - **L2** — Contexto: el usuario creó la credencial Neon `personal-assistant-bot` (`ai_gateway:invoke`) y está cargando `NEON_AI_GATEWAY_*` en `.env`; el agente no puede leer `.env`. Proyecto Neon `crimson-flower-57816235`, branch `main`, `aws-us-east-1`.
 - **L3** — Decisiones del orquestador (no pedidas explícitamente, reversibles): modelo `gpt-5-nano` con override `AI_MODEL`; respuesta fija para mensajes sin texto; mensaje fijo de fallo; timeouts 25 s / 10 s.
+- **L4** — Verify independiente (Risk items 2, 5): S1, S2, S3 cumplidos; build + runtime con Node OK (200/401/500); 0 vulnerabilidades (`npm audit --omit=dev`). Advisories: no hay test que fije los valores 25 s / 10 s; el 403 real del gateway solo se probó con mock.
