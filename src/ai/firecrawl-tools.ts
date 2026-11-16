@@ -34,6 +34,9 @@ function publicUrl(input: string): boolean {
 const query = z.string().trim().min(1).max(500)
 const url = z.string().min(1).max(2048).refine(publicUrl)
 const queryInput = z.object({ query }).strict()
+const webSearchInput = z.object({
+  query: query.describe('Consulta enfocada en lenguaje natural: incluí el tema y las restricciones reales del usuario (ubicación, idioma, producto o fechas si corresponden). Para hoy/últimas usá la fecha UTC del turno como referencia; no inventes años antiguos. Conservá literalmente el período histórico explícito; no agregues hoy ni el año actual a ese pedido. Ejemplos: «últimas noticias del tema» frente a «noticias del tema en el período pedido». Priorizá fuentes primarias/oficiales cuando corresponda; no fuerces un dominio oficial si no lo conocés. No pidas fecha si últimas ya es claro.'),
+}).strict()
 const pageInput = z.object({ url }).strict()
 const mapInput = z.object({ url, search: query.optional() }).strict()
 // OpenAI function parameters require an object root. Keep cross-field rules in
@@ -161,7 +164,7 @@ export function createFirecrawlTools(runtime: FirecrawlRuntime = firecrawlRuntim
   }
   const searchOptions = { limit: 5, toolDetail: 'full' as const, timeout: 15000 }
   return {
-    webSearch: define('Buscar precios, disponibilidad, noticias, viajes, compras, empleos, inmuebles o entradas actuales. Incluye contratos de fuentes, NO registros ejecutados.', queryInput, async (client, { query }) => {
+    webSearch: define('Buscar información factual externa cuando haga falta verificar noticias, precios, disponibilidad, viajes, compras, empleos, inmuebles o entradas, sin mencionar proveedores. No usar para saludos, reescrituras, aritmética ni respuestas ya disponibles en el historial. Formulá una consulta enfocada con el tema y las restricciones del usuario: para últimas/hoy tomá la fecha UTC del turno, sin años obsoletos inventados; para historia respetá el período explícito, sin forzar actualidad. Preferí fuentes primarias/oficiales si son pertinentes y conocidas. Los snippets no prueban la lectura del artículo: seguí con readWebPage sobre URLs concretas para verificar fechas y contenido; un índice no es una noticia. Los contratos no son registros ejecutados ni evidencia en vivo. Los resultados pueden estar desactualizados.', webSearchInput, async (client, { query }) => {
       const data = await client.search(query, { sources: ['web', 'alexandria'], ...searchOptions })
       return { results: data.web, sources: (data.web ?? []).slice(0, 5).map(r => 'url' in r ? r.url : r.metadata?.sourceURL), contracts: contracts(data.tools), truncated: (data.tools?.length ?? 0) > 5 }
     }),

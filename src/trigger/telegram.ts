@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai'
 import { webhooks } from '@trigger.dev/sdk'
 import { chat, defaultStorage } from '@trigger.dev/sdk/ai'
 import { stepCountIs, type LanguageModel } from 'ai'
-import { INSTRUCTIONS, WEB_UNAVAILABLE, modelId } from '../ai/assistant.js'
+import { INSTRUCTIONS, instructionsForTurn, modelId } from '../ai/assistant.js'
 import { createFirecrawlTools, firecrawlRuntime, type FirecrawlRuntime } from '../ai/firecrawl-tools.js'
 import { sendTelegramReply } from '../telegram/api.js'
 import { inboundText, type TelegramUpdate } from '../telegram/update.js'
@@ -45,6 +45,7 @@ export function createTelegramAssistant<TId extends string>(
   id: TId,
   model: () => LanguageModel = () => openai(modelId()),
   web: FirecrawlRuntime = firecrawlRuntime,
+  now: () => Date = () => new Date(),
 ) {
   return chat.agent({
     id,
@@ -61,7 +62,7 @@ export function createTelegramAssistant<TId extends string>(
       return streamText({
         model: model(),
         messages,
-        instructions: available ? INSTRUCTIONS : `${INSTRUCTIONS}\n${WEB_UNAVAILABLE}`,
+        instructions: instructionsForTurn(now(), available),
         tools,
         activeTools: available ? undefined : [],
         abortSignal: signal,

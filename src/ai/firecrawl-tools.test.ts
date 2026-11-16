@@ -46,6 +46,32 @@ describe('read-only web tools', () => {
     assert.deepEqual((lookup.properties?.operation as { enum: string[] }).enum, ['query', 'markets'])
   })
 
+  it('exposes search intent and temporal guidance in the model-facing description and JSON schema', async () => {
+    const { tools } = fixture()
+    const description = String(tools.webSearch.description)
+    for (const rule of ['información factual externa', 'saludos', 'reescrituras', 'aritmética', 'historial', 'sin mencionar proveedores', 'contratos no son registros', 'snippets no prueban la lectura']) {
+      assert.ok(description.includes(rule), rule)
+    }
+    const schema = await asSchema(tools.webSearch.inputSchema).jsonSchema
+    assert.equal(schema.type, 'object')
+    assert.equal(schema.additionalProperties, false)
+    const query = schema.properties?.query as { description?: string; maxLength?: number }
+    assert.equal(query.maxLength, 500)
+    for (const rule of ['lenguaje natural', 'tema y las restricciones reales', 'fecha UTC del turno', 'no inventes años', 'período histórico explícito', 'no agregues hoy', 'fuentes primarias/oficiales', 'no fuerces un dominio', 'últimas noticias del tema', 'noticias del tema en el período pedido']) {
+      assert.ok(query.description?.includes(rule), rule)
+    }
+  })
+
+  it('passes current and explicit historical queries unchanged to the SDK', async () => {
+    const f = fixture()
+    for (const query of ['últimas noticias de OpenAI hoy', 'OpenAI noticias del 1 al 31 de diciembre de 2025']) {
+      const result = await f.run('webSearch', { query })
+      assert.equal(result.status, 'ok')
+      assert.equal(f.calls.at(-1)?.[1], query)
+    }
+    assert.equal(f.calls.length, 2)
+  })
+
   it('maps search, read, map and discovery to installed SDK shapes', async () => {
     const f = fixture()
     await f.run('webSearch', { query: 'prices' })

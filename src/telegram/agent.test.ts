@@ -125,6 +125,47 @@ describe('telegram assistant agent', () => {
     assert.ok(JSON.stringify(model.doStreamCalls[0].prompt).includes('no está disponible en este turno'))
   })
 
+  for (const available of [true, false]) {
+    it(`refreshes UTC date each turn in the same session (browsing ${available ? 'available' : 'unavailable'})`, async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+      globalThis.fetch = (async () => new Response('{}')) as typeof fetch
+      let now = new Date('2042-01-01T00:30:00+02:00')
+      let clockCalls = 0
+      const model = modelWithText('ok')
+      const agent = createTelegramAssistant(`telegram-assistant-test-${++n}`, () => model, {
+        getKey: () => available ? 'fake-key' : undefined,
+        createClient: async () => { throw Error('no tool execution expected') },
+      }, () => { clockCalls++; return now })
+      assert.equal(clockCalls, 0)
+      const harness = mockChatAgent(agent, { chatId: `clock-${n}` })
+      try {
+        await harness.sendChannelEvent({ event: update(40, 562, 'últimas noticias de OpenAI'), connectorId: 'telegram' })
+        now = new Date('2042-01-01T00:30:00Z')
+        await harness.sendChannelEvent({ event: update(41, 562, '¿Y ahora?'), connectorId: 'telegram' })
+      } finally { await harness.close() }
+      assert.equal(clockCalls, 2)
+      assert.equal(model.doStreamCalls.length, 2)
+      const first = JSON.stringify(model.doStreamCalls[0].prompt.filter(m => m.role === 'system'))
+      const second = JSON.stringify(model.doStreamCalls[1].prompt.filter(m => m.role === 'system'))
+      assert.ok(first.includes('2041-12-31 UTC'))
+      assert.ok(second.includes('2042-01-01 UTC') && !second.includes('2041-12-31 UTC'))
+      assert.ok(JSON.stringify(model.doStreamCalls[1].prompt).includes('últimas noticias de OpenAI'))
+      for (const call of model.doStreamCalls) {
+        assert.deepEqual(call.providerOptions?.openai, { reasoningEffort: 'minimal' })
+        if (available) {
+          const search = call.tools?.find(t => t.type === 'function' && t.name === 'webSearch')
+          assert.ok(search?.type === 'function')
+          assert.ok(search.description?.includes('información factual externa'))
+          const query = search.inputSchema.properties?.query as { description?: string }
+          assert.ok(query.description?.includes('fecha UTC del turno'))
+        } else {
+          assert.equal(call.tools?.length ?? 0, 0)
+          assert.ok(JSON.stringify(call.prompt).includes('no está disponible en este turno'))
+        }
+      }
+    })
+  }
+
   // Deterministic fixtures prove execution/plumbing, not a live model's semantic selection.
   for (const scenario of [
     { name: 'webSearch', input: { query: 'precio zapatillas hoy' }, user: 'Compará el precio de zapatillas hoy', response: { web: [{ url: 'https://example.com/precio', title: 'Precio verificado' }] } },

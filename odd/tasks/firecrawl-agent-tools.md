@@ -1,7 +1,7 @@
 # Firecrawl tools for the Telegram Trigger.dev agent
 
 Canonical user intent for adding intent-driven web tools to the existing Telegram agent.
-Tracking only: S1–S4 implementation and verification are fully delivered in two committed work units; native assessments report review not due.
+Tracking only: S1–S4 implementation and verification are fully delivered in two committed work units; native assessments report review not due. S5 refinement is implemented with worker self-verification; parent verification and closure remain pending.
 User environment/deployment activation is separate from the completed tasks; implementation decisions are recorded separately from user requirements.
 
 ## Specs
@@ -11,6 +11,7 @@ User environment/deployment activation is separate from the completed tasks; imp
   - "Tené en cuenta que los clientes que utilizan este bot no conocen Firecrawl ni Alexandria, por lo que el bot debe decidir inteligentemente cuándo utilizar estas herramientas según lo que solicite el usuario, sin necesidad de que este mencione ninguna de esas tecnologías."
 - **S3** — "Utilizá las skills de **Firecrawl, Trigger y AI SDK**."
 - **S4** — "Al finalizar, indicame si necesito agregar alguna variable de entorno (*environment variable*) para que funcione correctamente."
+- **S5** — "dale mejora la busqueda mas que todo afinar la descripcion de la tool para tener una busqueda mas certera a la hora de utilizar la tool"
 
 ## Tasks
 
@@ -18,6 +19,8 @@ User environment/deployment activation is separate from the completed tasks; imp
   - **U1 — `2b4f0ec`:** Runtime tools, tests, and Firecrawl SDK dependency; approximately 435 authored lines excluding the lockfile.
   - **U2 — `d995729`:** Agent integration, instructions, documentation, and integration tests; approximately 145 authored lines.
 - **T2 — Done — S1–S4:** Independent functional verification passed after the three targeted sanitizer fixes recorded in L3. Both work-unit native assessments report `nativeRisk: medium`, `reviewDue: false`, reason `under_budget` (exact ranges in L4). No native lineage or review ran, and no approval is claimed. Implementation and verification are fully delivered; user environment/deployment activation is separate, not an unfinished implementation task. Live OpenAI semantic choice and runtime Firecrawl calls remain unverified.
+
+- **T3 — Implementation complete; parent verification pending — S5:** Refined the existing search tool description and query guidance, per-turn UTC date context, and temporal/article-evidence instructions; added deterministic prompt/schema/plumbing tests and focused README notes. Preserved the model, provider calls, safety guards, budgets and completed T1/T2. Parent sequence: refinement → verification → close; no publishing authorized.
 
 ## Log
 
@@ -53,3 +56,11 @@ User environment/deployment activation is separate from the completed tasks; imp
   - **Dependency audit:** `npm audit --omit=dev` reported zero vulnerabilities. Full `npm audit` reported two high-severity findings involving `@prisma/config` / `deepmerge-ts` through the existing `@trigger.dev/build` version `4.8.5` development dependency, traced with `npm explain`. No audit fix was run.
   - **Activation and unchanged behavior:** `FIRECRAWL_API_KEY` is required for browsing; without it only the tools are disabled, not chat. Configure local development through `.env` and production through Trigger Production environment variables, not Railway. The model and minimal reasoning, webhook ID, and registration remain unchanged. User environment/deployment activation is separate from the fully delivered implementation and verification tasks.
   - **Authorization and artifacts:** No push, merge, or deploy was authorized or performed. Generated untracked `dist/` from the allowed build remains uncommitted. This final tracking update makes no source changes or commits.
+
+- **L5 — Follow-up user request (verbatim):**
+
+  > dale mejora la busqueda mas que todo afinar la descripcion de la tool para tener una busqueda mas certera a la hora de utilizar la tool
+
+- **L6 — Parent-provided acceptance evidence and bounded refinement decisions (not additional user requirements):** The parent inspected the Trigger transcript for `run_06gubipdupb22f85tejcom6la2`, version `20261116.11`: a latest-OpenAI-news request produced webSearch query `OpenAI latest news 2024 2025 OpenAI novidades últimas noticias`. Successful results included actual November 16, 2026 article URLs inside an OpenAI news snippet; the model instead called a December 11, 2025 GPT-5.2 item recent and selected a generic index. This is reported temporal/query/evidence-selection failure, not API wiring failure. Refine Spanish tool/query descriptions and instructions, supply the current UTC date anew per managed run turn, preserve explicit historical ranges, and distinguish concrete dated articles from index pages and snippets. Tests establish deterministic instructions/schema/plumbing, not improved live model intelligence. No query rewriting pipeline, new tools, provider/model changes, dependencies, telemetry or live requests are authorized.
+
+- **L7 — S5 writer implementation and self-verification (not independent verification or live acceptance):** Added model-facing Spanish search/query guidance, a per-run-turn UTC date via injectable clock, concrete dated-article evidence rules, and README notes. RED `npm test`: exit 1, 42 passed / 5 expected new failures. GREEN `npm test`: exit 0, 47/47 tests across 8 suites. `npx tsc --noEmit`, `npx tsc -p tsconfig.build.json --noEmit`, `npx hono --help`, and `npx hono routes src/app.ts` all exited 0; Hono still exposes only `GET /`. Controlled-date fixtures cover UTC rollover within one session with and without browsing, actual model tool descriptions/schema, unchanged current/historical query arguments, and existing no-tool/history behavior. These prove deterministic prompt/plumbing contracts, not better live-model query quality. No CLI/parser changes require differential checking. No build, bundle, live API call, restart, commit, push or deploy was run; parent-generated `dist/` is untouched. Parent verification/closure remains pending.
