@@ -13,14 +13,14 @@ Branch: `feat/telegram-trigger-chat-agent`. Docs: SDK 4.8.5 bundled docs (`node_
   - The Hono webhook route `POST /telegram/webhook`, its module and its tests are removed; `GET /` stays. The Hono app no longer needs `TELEGRAM_*` or `OPENAI_API_KEY`.
 - **S2** — "Then, add transcript-based persistance for the agent to have memory of the conversation without needing a database."
   - Memory uses the chat.agent transcript storage (the documented default platform snapshot per session, `docs/ai-chat/patterns/persistence-and-replay.mdx`, `transcript-storage.mdx`), configured explicitly so it is visible in code. No database, no extra infrastructure. Each Telegram chat keeps its own transcript across messages and across runs (a new run boots from the snapshot).
-  - Documented limits are recorded in the README: transcript compacted to about the last 100 messages; snapshots have no expiry by default.
+  - Documented limits are recorded in the README: snapshots accumulate with no expiry by default (`persistence-and-replay.mdx`). The "~100 messages" figure from exploration is NOT in the bundled docs and must not be claimed.
 - **S3** — "Tell me the steps required to register the new webhook to Telegram Bot API."
   - README documents, for dev and prod: get the endpoint URL from the Trigger.dev dashboard **Webhooks** page, set the endpoint's signing secret (`npx trigger.dev@latest webhooks generate-secret <endpoint> --env <env> --to-env TELEGRAM_WEBHOOK_SECRET` or `set-secret --from-env`), then call Telegram `setWebhook` with `url` and the same value as `secret_token`, and check with `getWebhookInfo`. Notes: Telegram allows one webhook per bot, so this stops traffic to the Railway route; prod requires Trigger.dev deploys (currently blocked for the org); the dev endpoint only processes updates while `npx trigger.dev@latest dev` runs; `TELEGRAM_BOT_TOKEN` and `OPENAI_API_KEY` must exist in the Trigger.dev environment.
 - **S4** — "Use hono, trigger, ai-sdk, and firecrawl skills to find relevant documentation". Writers load the trigger, ai-sdk and hono skills; APIs are checked against the installed SDK docs and types.
 
 ## Tasks
 
-- T1 — S1, S2, S4 — writer `gentle-ai-worker` — endpoint + chat.agent + channel + transcript storage + tests; remove Hono webhook — commit: pending
+- T1 — S1, S2, S4 — writer `gentle-ai-worker` — endpoint + chat.agent + channel + transcript storage + tests; remove Hono webhook — commit: 07b6e51 (22/22 tests)
 - T2 — S1, S2, S3 — writer `gentle-ai-worker` — README/AGENTS.md: architecture, env vars, registration steps — commit: pending
 
 ## Log
@@ -32,5 +32,5 @@ Branch: `feat/telegram-trigger-chat-agent`. Docs: SDK 4.8.5 bundled docs (`node_
   > Tell me the steps required to register the new webhook to Telegram Bot API.
   > Use hono, trigger, ai-sdk, and firecrawl skills to find relevant documentation like:
   > https://trigger.dev/docs/webhooks/overview
-- **L2** — Exploration (bundled SDK 4.8.5 docs): webhooks are public beta (SDK ≥ 4.8.1); endpoint per environment, discovered by `trigger dev`/deploy, URL on the dashboard Webhooks page; deliveries rejected until the endpoint has a signing secret; `chat.channels.custom({ id, endpoint, key, inbound, send })` routes deliveries into one session per key; default transcript storage is a platform snapshot (~100 messages after compaction, no expiry). Uncertain: exact `shared-secret` header option semantics (verify in `@trigger.dev/core` types).
+- **L2** — Exploration (bundled SDK 4.8.5 docs): webhooks are public beta (SDK ≥ 4.8.1); endpoint per environment, discovered by `trigger dev`/deploy, URL on the dashboard Webhooks page; deliveries rejected until the endpoint has a signing secret; `chat.channels.custom({ id, endpoint, key, inbound, send })` routes deliveries into one session per key; default transcript storage is a platform snapshot (no expiry; a "~100 messages" claim was unverified and dropped). Uncertain: exact `shared-secret` header option semantics (verify in `@trigger.dev/core` types).
 - **L3** — Orchestrator decisions: non-text updates produce no reply (previously a fixed text); long replies split at 4096 chars; Trigger.dev prod deploys are blocked for the org, so the change stays on the branch and production keeps the Railway route until the user re-registers the webhook.
