@@ -2,9 +2,13 @@
 
 Run `npx hono --help` first, and use the CLI instead of a dev server.
 
-The app is exported from `src/app.ts` (`src/index.ts` only starts the server), so pass that file to every CLI command, e.g. `npx hono request / src/app.ts -e ai -e @ai-sdk/openai`.
+The app is exported from `src/app.ts` (`src/index.ts` only starts the server), so pass that file to every CLI command, e.g. `npx hono request / src/app.ts` or `npx hono routes src/app.ts`.
 
-Always pass `-e ai -e @ai-sdk/openai` (mark those packages as external; `zod` is no longer needed); without them the CLI fails with `Dynamic require of "path" is not supported`.
+No flags are required now that `src/app.ts` no longer imports `ai`/`@ai-sdk/openai`. If the app imports them again and the CLI fails with `Dynamic require of "path" is not supported`, add `-e ai -e @ai-sdk/openai` (the form `-e ai -e @ai-sdk/openai -e @trigger.dev/sdk` also still works).
+
+## Telegram bot
+
+The Telegram bot lives in `src/trigger/telegram.ts` (Trigger.dev hosted webhook endpoint `telegram` + `chat.agent` `telegram-assistant`). The Hono app (`src/app.ts`) no longer has `/telegram/webhook`; it only serves `GET /`. Bot env vars (`TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `AI_MODEL`) belong to the Trigger.dev environment, not Railway. Registration steps are in `README.md`.
 
 ## Railway environment variables
 
