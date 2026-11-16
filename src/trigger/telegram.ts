@@ -48,7 +48,7 @@ export function createTelegramAssistant<TId extends string>(
     id,
     channels: [telegramChannel],
     // Conversation memory: the documented default platform snapshot per session
-    // (about the last 100 messages once compacted, no expiry). No database.
+    // (snapshots accumulate with no expiry by default). No database.
     storage: defaultStorage,
     system: INSTRUCTIONS,
     run: async ({ messages, signal, streamText }) =>
