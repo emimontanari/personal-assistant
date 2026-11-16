@@ -27,6 +27,17 @@ Las tres primeras son obligatorias. En local van en un archivo `.env`; en el dep
 - `400`: el body no es JSON válido.
 - `200`: en cualquier otro caso, incluso si el update no trae `message`, si falla la generación o si falla `sendMessage` (así Telegram no reintenta el update).
 
+## Tareas en segundo plano (Trigger.dev)
+
+Proyecto: `proj_jlpqfxtzvlysgjgaxtuo`. La tarea exportada `hello-world` está en `src/trigger/example.ts`; no llama al webhook ni a servicios externos.
+
+1. Autenticate con `npx trigger.dev@latest login` si hace falta.
+2. Copiá la clave de desarrollo `TRIGGER_SECRET_KEY` desde el dashboard a tu `.env` local. No la subas al repo.
+3. Ejecutá `npx trigger.dev@latest dev` en otra terminal, separado del servidor Hono.
+4. En el [dashboard del proyecto](https://cloud.trigger.dev/projects/v3/proj_jlpqfxtzvlysgjgaxtuo), seleccioná el entorno Development y probá `hello-world` con `{}`. El resultado esperado es `{"message":"Hello, world!"}` después de una espera de cinco segundos.
+
+`npx tsc --noEmit` comprueba la aplicación y `trigger.config.ts`. `npm run build` usa `tsconfig.build.json` para conservar `dist/index.js` como entrada del servidor; Trigger.dev compila sus tareas por separado. Los archivos locales de Trigger.dev se ignoran en `.trigger/`.
+
 ## Registrar el webhook
 
 Requiere una URL pública con HTTPS.

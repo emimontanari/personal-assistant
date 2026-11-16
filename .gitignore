@@ -32,3 +32,5 @@ lerna-debug.log*
 .pi/mcp.json
 .firecrawl/
 .neon
+
+.trigger
