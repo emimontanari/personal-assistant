@@ -1,8 +1,9 @@
 import { openai } from '@ai-sdk/openai'
 import { webhooks } from '@trigger.dev/sdk'
 import { chat, defaultStorage } from '@trigger.dev/sdk/ai'
-import type { LanguageModel } from 'ai'
-import { INSTRUCTIONS, modelId } from '../ai/assistant.js'
+import { stepCountIs, type LanguageModel } from 'ai'
+import { INSTRUCTIONS, WEB_UNAVAILABLE, modelId } from '../ai/assistant.js'
+import { createFirecrawlTools, firecrawlRuntime, type FirecrawlRuntime } from '../ai/firecrawl-tools.js'
 import { sendTelegramReply } from '../telegram/api.js'
 import { inboundText, type TelegramUpdate } from '../telegram/update.js'
 
@@ -43,6 +44,7 @@ export const telegramChannel = chat.channels.custom({
 export function createTelegramAssistant<TId extends string>(
   id: TId,
   model: () => LanguageModel = () => openai(modelId()),
+  web: FirecrawlRuntime = firecrawlRuntime,
 ) {
   return chat.agent({
     id,
@@ -51,14 +53,23 @@ export function createTelegramAssistant<TId extends string>(
     // (snapshots accumulate with no expiry by default). No database.
     storage: defaultStorage,
     system: INSTRUCTIONS,
-    run: async ({ messages, signal, streamText }) =>
-      streamText({
+    // Trigger resolves this once each turn, preserving tool conversion across history
+    // while giving parallel executions a fresh, shared turn-local budget.
+    tools: () => createFirecrawlTools(web),
+    run: async ({ messages, tools, signal, streamText }) => {
+      const available = Boolean(web.getKey())
+      return streamText({
         model: model(),
         messages,
+        instructions: available ? INSTRUCTIONS : `${INSTRUCTIONS}\n${WEB_UNAVAILABLE}`,
+        tools,
+        activeTools: available ? undefined : [],
         abortSignal: signal,
+        stopWhen: stepCountIs(5),
         // gpt-5-nano is a reasoning model: the lowest effort keeps billed tokens down.
         providerOptions: { openai: { reasoningEffort: 'minimal' } },
-      }),
+      })
+    },
   })
 }
 

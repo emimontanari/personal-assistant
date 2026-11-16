@@ -14,6 +14,32 @@ Telegram → endpoint webhook `telegram` → chat.agent `telegram-assistant` (un
 - Los updates sin texto (foto, sticker, etc.) no generan respuesta. Las respuestas de más de 4096 caracteres se envían en varios mensajes.
 - [Hono](https://hono.dev) en Railway solo sirve `GET /` (`src/app.ts`). Ya no existe `POST /telegram/webhook`.
 
+## Herramientas web por intención
+
+Las skills de `.agents/skills/` guían a quienes programan; no son herramientas ejecutables ni se copian al prompt. El bot tiene cinco tools reales AI SDK en `src/ai/firecrawl-tools.ts`, registradas en `chat.agent` y reenviadas desde su `run` al `streamText` administrado por Trigger.dev:
+
+| Intención / ejemplo del catálogo [Prompts](https://www.firecrawl.dev/prompts) | Tool |
+| --- | --- |
+| «Compará precios de zapatillas», vuelos/hoteles, entradas, noticias, empleos nuevos o alquileres | `webSearch` (web + descubrimiento Alexandria) |
+| «Resumí esta URL» | `readWebPage` |
+| «Encontrá la página de precios de este sitio» | `mapWebsite`, luego lectura |
+| «Probabilidades de este evento», información financiera o registros estructurados | `discoverDataSources`, luego solo una consulta permitida si corresponde |
+| Buscar eventos de predicción o leer slugs exactos | `predictionMarketLookup` (`query` / `markets`) |
+
+No hace falta mencionar Firecrawl ni Alexandria. Saludos, reescrituras y preguntas sobre el historial no necesitan web. El agente recibe instrucciones para citar enlaces, distinguir precios estimados de verificados y datos actuales de históricos, y pedir fecha, destino, ubicación o moneda solo cuando sea necesario.
+
+**Alcance limitado:** descubrir contratos no ejecuta proveedores ni devuelve registros actuales. Solo se ejecutan los endpoints de lectura `polymarket/search/query` (`q`, `limit_per_type: 5`) y `polymarket/markets/list` (`slug`, `closed` opcional, `limit: 5`), cotejados con los contratos reales de `firecrawl find-tools` guardados durante la investigación en `.firecrawl/firecrawl-alexandria-contracts.json` (archivo local ignorado). No se muestran ejemplos de contratos como datos vivos. Los demás proveedores solo se descubren; se puede recurrir a páginas web con límites explícitos. No se prometen los 35 casos del catálogo: no hay historial de precios garantizado, reservas, compras, trades, alertas, monitoreo, crawl, shell, login ni aceptación automática de términos. Una negativa por permisos, términos o saldo se devuelve como no disponible, sin reintentos.
+
+**Límites y costos:** máximo cinco pasos de modelo y cinco ejecuciones totales por turno, incluso en paralelo, con estado nuevo por turno/chat. Hasta cinco resultados/contratos y 12.000 caracteres de JSON por llamada, con `truncated` explícito; también se acotan los campos y arreglos anidados. Queries de hasta 500 caracteres y URLs de hasta 2048. Se consumen créditos Firecrawl según endpoint/proveedor y tokens OpenAI por las consultas y resultados; estos límites no son un presupuesto monetario garantizado. No se envía feedback automáticamente.
+
+El SDK oficial 4.54.0 usa timeout de operación de 15 s: búsqueda, lectura y mapa tienen timeout HTTP de 20 s (añade 5 s). `discoverDataSources` usa `search` con `sources: ['alexandria']`, no `findTools` ni ejecución Alexandria, por lo que también tiene 20 s. Solo `predictionMarketLookup` usa el overload Alexandria: allí el SDK reemplaza el timeout HTTP con 15 s + 30 s de margen, hasta 45 s. Se configura un solo intento (`maxRetries: 1` cuenta intentos en esta versión; cero no hace ninguna solicitud), sin reintentos automáticos, sin auto-resume de scrape y sin parseo de archivos/PDF. No admite `AbortSignal` en estas llamadas: Stop cancela el modelo y evita nuevas llamadas/descarta resultados, pero **no cancela la solicitud API paga ya iniciada**; esta puede seguir hasta su timeout y generar costo, y el trabajo remoto podría continuar incluso tras un timeout de transporte. No hay carreras de timers que abandonen operaciones activas.
+
+Se rechazan URLs con credenciales, protocolos distintos de HTTP(S), hosts de una sola etiqueta, localhost y direcciones literales privadas/loopback/link-local, incluyendo IPv4 mapeado en IPv6. Firecrawl hace la descarga remota, nunca el servidor local hacia la URL del usuario. Esto **no garantiza** protección completa frente a DNS privado/rebinding ni redirecciones controladas por el servicio. El contenido recuperado se trata como datos no confiables, no instrucciones; no deben enviarse secretos ni datos personales innecesarios del historial.
+
+**Configuración:** agregá `FIRECRAWL_API_KEY` al `.env` local para Trigger Development y a las variables del entorno Production de Trigger.dev. No hace falta en Railway; no sincronices ninguna clave `TRIGGER_SECRET_KEY` ni cambies la configuración del webhook. La clave se lee al ejecutar, sin credenciales embebidas. Sin ella se ocultan las tools en cada turno, se informa al modelo que no hay consulta en vivo y el chat normal sigue funcionando.
+
+Las pruebas son offline, con clientes inyectados y modelos deterministas multistep: verifican ejecución, resultados, fuentes y continuidad del historial, **no** la selección semántica de un modelo real ni funcionamiento en producción.
+
 ## Memoria de la conversación
 
 Cada chat de Telegram conserva su propio historial gracias al *transcript storage* por defecto de `chat.agent` (`storage: defaultStorage`): un snapshot por sesión en el almacenamiento de objetos de Trigger.dev. No hay base de datos ni infraestructura extra; una run nueva retoma desde el snapshot.
@@ -29,6 +55,7 @@ Límites documentados:
 | `TELEGRAM_BOT_TOKEN` | Entorno de Trigger.dev | Token del bot (@BotFather). |
 | `OPENAI_API_KEY` | Entorno de Trigger.dev | API key de OpenAI; la lee `@ai-sdk/openai`. |
 | `AI_MODEL` | Entorno de Trigger.dev | Opcional. Por defecto `gpt-5-nano`. |
+| `FIRECRAWL_API_KEY` | `.env` local (Development) / variables de Trigger.dev (Production) | Habilita las consultas web; opcional para conversar sin web. No configurar ni sincronizar en Railway. |
 | `TELEGRAM_WEBHOOK_SECRET` | Local / tu terminal | Secreto de firma del endpoint `telegram`, también enviado a Telegram como `secret_token`. |
 
 - Las variables del bot tienen que existir en el entorno de Trigger.dev, ya no en Railway. En Development, `trigger dev` lee el `.env` local; en Production, cargalas en las variables de entorno del dashboard de Trigger.dev.

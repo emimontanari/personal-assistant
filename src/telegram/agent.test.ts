@@ -5,6 +5,7 @@ import { afterEach, describe, it, mock } from 'node:test'
 import { simulateReadableStream } from 'ai'
 import { MockLanguageModelV4 } from 'ai/test'
 import { createTelegramAssistant, telegramChannel } from '../trigger/telegram.js'
+import type { FirecrawlRuntime } from '../ai/firecrawl-tools.js'
 
 function modelWithText(text: string) {
   return new MockLanguageModelV4({
@@ -108,6 +109,82 @@ describe('telegram assistant agent', () => {
     const second = JSON.stringify(model.doStreamCalls[1].prompt)
     assert.ok(second.includes('primero') && second.includes('segundo'))
   })
+
+  it('does not offer web tools without a key and explicitly explains unavailable browsing', async () => {
+    process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+    globalThis.fetch = (async () => new Response('{}')) as typeof fetch
+    const model = modelWithText('No puedo verificar precios en vivo.')
+    const agent = createTelegramAssistant(`telegram-assistant-test-${++n}`, () => model, {
+      getKey: () => undefined,
+      createClient: async () => { throw Error('must not create client') },
+    })
+    const harness = mockChatAgent(agent, { chatId: 'no-key' })
+    try { await harness.sendChannelEvent({ event: update(20, 560, 'precio actual de entradas'), connectorId: 'telegram' }) }
+    finally { await harness.close() }
+    assert.equal(model.doStreamCalls[0].tools?.length ?? 0, 0)
+    assert.ok(JSON.stringify(model.doStreamCalls[0].prompt).includes('no está disponible en este turno'))
+  })
+
+  // Deterministic fixtures prove execution/plumbing, not a live model's semantic selection.
+  for (const scenario of [
+    { name: 'webSearch', input: { query: 'precio zapatillas hoy' }, user: 'Compará el precio de zapatillas hoy', response: { web: [{ url: 'https://example.com/precio', title: 'Precio verificado' }] } },
+    { name: 'predictionMarketLookup', input: { operation: 'query', q: 'bitcoin' }, user: 'Qué probabilidades tiene bitcoin de subir este mes', response: { requestId: 'request-1', scrapeId: 'scrape-1', alexandria: [{ provider: 'polymarket', capability: 'search/query', data: { events: [{ title: 'Bitcoin', url: 'https://example.com/precio' }] } }] } },
+  ]) {
+    it(`forwards ${scenario.name} execution and result through Telegram, retaining tools and history next turn`, async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+      const sent: string[] = []
+      globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+        sent.push(JSON.parse(String(init?.body)).text)
+        return new Response('{}')
+      }) as typeof fetch
+      const requests: unknown[] = []
+      const web = {
+        getKey: () => 'fake-key',
+        createClient: async () => ({
+          search: async (...args: unknown[]) => {
+            requests.push(args)
+            return scenario.name === 'predictionMarketLookup'
+              ? { tools: [{ provider: 'polymarket', capability: 'search/query', description: 'Search public prediction events' }] }
+              : scenario.response
+          },
+          scrape: async (...args: unknown[]) => { requests.push(args); return scenario.response },
+        }),
+      } as unknown as FirecrawlRuntime
+      let step = 0
+      const textModel = modelWithText('Verificado: https://example.com/precio')
+      const model = new MockLanguageModelV4({ doStream: async (options) => {
+        const current = step++
+        const discover = scenario.name === 'predictionMarketLookup' && current === 0
+        if (current >= (scenario.name === 'predictionMarketLookup' ? 2 : 1)) return textModel.doStream(options)
+        return { stream: simulateReadableStream({ chunks: [
+          { type: 'tool-call', toolCallId: discover ? 'discover-1' : 'lookup-1', toolName: discover ? 'discoverDataSources' : scenario.name, input: JSON.stringify(discover ? { query: 'prediction market bitcoin' } : scenario.input) },
+          { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage: {
+            inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 1, text: 0, reasoning: undefined },
+          } },
+        ] }) }
+      } })
+      const agent = createTelegramAssistant(`telegram-assistant-test-${++n}`, () => model, web)
+      const chatId = `tools-${n}`
+      const harness = mockChatAgent(agent, { chatId })
+      try {
+        await harness.sendChannelEvent({ event: update(30, 561, scenario.user), connectorId: 'telegram' })
+        const { __waitForChannelEgressForTests } = await import('@trigger.dev/sdk/ai')
+        await __waitForChannelEgressForTests(chatId)
+        await harness.sendChannelEvent({ event: update(31, 561, 'Recordame la fuente'), connectorId: 'telegram' })
+        await __waitForChannelEgressForTests(chatId)
+      } finally { await harness.close() }
+      const expectedRequests = scenario.name === 'predictionMarketLookup' ? 2 : 1
+      assert.equal(requests.length, expectedRequests)
+      assert.equal(model.doStreamCalls.length, expectedRequests + 2)
+      assert.ok(model.doStreamCalls.every(call => call.tools?.some(t => t.type === 'function' && t.name === scenario.name)))
+      const resultPrompt = JSON.stringify(model.doStreamCalls[expectedRequests].prompt)
+      assert.ok(resultPrompt.includes('tool-result') && resultPrompt.includes('https://example.com/precio'))
+      const nextPrompt = JSON.stringify(model.doStreamCalls[expectedRequests + 1].prompt)
+      assert.ok(nextPrompt.includes(scenario.user) && nextPrompt.includes('lookup-1') && nextPrompt.includes('https://example.com/precio'))
+      assert.ok(sent[0].includes('https://example.com/precio'))
+    })
+  }
 
   it('exposes the channel under the id the endpoint routes to', () => {
     assert.equal(telegramChannel.id, 'telegram')

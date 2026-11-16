@@ -10,6 +10,14 @@ No flags are required now that `src/app.ts` no longer imports `ai`/`@ai-sdk/open
 
 The Telegram bot lives in `src/trigger/telegram.ts` (Trigger.dev hosted webhook endpoint `telegram` + `chat.agent` `telegram-assistant`). The Hono app (`src/app.ts`) no longer has `/telegram/webhook`; it only serves `GET /`. Bot env vars (`TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `AI_MODEL`) belong to the Trigger.dev environment, not Railway. Registration steps are in `README.md`.
 
+## Runtime web tools
+
+Coding skills in `.agents/skills/` are authoring guidance, not runtime tools or prompt text. The Telegram agent declares and forwards five real AI SDK tools from `src/ai/firecrawl-tools.ts` via Trigger's managed `run.streamText`; never import `streamText` from `ai`. Resolve tools per turn to isolate the shared five-execution parallel-safe budget. Preserve the five-step cap and no-key fallback.
+
+Intent routes: current shopping/travel/tickets/jobs/housing/news → search; supplied URL → read; a subpage in a known site → map; structured/live financial/public data → discovery before vetted lookup. Only `polymarket/search/query` and `polymarket/markets/list` may execute provider calls, using the CLI-discovered contracts cited in README. Discovery is not live records. No arbitrary provider/options dispatch, terms acceptance, booking, trades, alerts, crawl or shell. Do not claim the complete prompts catalogue is supported.
+
+`FIRECRAWL_API_KEY` belongs in local `.env` for Trigger Development and Trigger Production env vars, never Railway sync. Missing key disables offering tools without breaking chat. Keep SDK lazy, no embedded credentials, bounded output, URL validation, sanitized errors and no automatic retries. SDK 4.54.0 lacks request signals: abort stops the model and prevents new calls/discards results, but never cancels an in-flight paid API request. Search/read/map and discovery (search with Alexandria sources, not findTools) have 20 s transport timeouts; vetted Polymarket execution has 45 s because the SDK adds a mandatory 30 s response margin to its 15 s operation timeout. Remote work may outlive a transport timeout. Keep maxRetries: 1 (one attempt in this SDK; zero makes no request) and scrape autoResume: false. DNS/redirect SSRF is not fully controlled locally. See README for scope, costs and limits. Offline model fixtures prove plumbing, not real semantic intent selection.
+
 ## Railway environment variables
 
 - Never overwrite Railway's `TRIGGER_SECRET_KEY` with the local value. The local `.env` key belongs to the Trigger.dev Development environment and must never be used in production (Railway needs the Production key).
