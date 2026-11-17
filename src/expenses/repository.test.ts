@@ -11,7 +11,12 @@ import type { FxEvidence } from './money.js';
 const input: RegisterInput = { ownerId: '123', sourceKey: 'turn-1', description: 'Lunch', amount: '10.50', currency: 'ARS', expenseDate: '2024-02-29' };
 function evidence(three = false): FxEvidence {
   const sells = three ? ['1000', '1001', '1001'] : ['1000', '1001'];
-  return { quoteDate: '2024-02-28', rateNumeratorMicro: three ? '3002000000' : '2001000000', rateDenominator: sells.length, meanRate: three ? '1000.666667' : '1000.500000', arsCents: three ? '1050700' : '1050525', quotes: sells.map((sell, i) => ({ portal: `portal-${i}`, sourceUrl: `https://example.com/${i}`, quoteDate: '2024-02-28', sell, observedAt: '2024-02-29T12:00:00Z' })) };
+  const sources = [
+    {portal:'DolarAPI',sourceUrl:'https://dolarapi.com/v1/dolares/oficial'},
+    {portal:'Bluelytics',sourceUrl:'https://api.bluelytics.com.ar/v2/evolution.json?days=512'},
+    {portal:'ArgentinaDatos',sourceUrl:'https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial/2024/02/28'},
+  ];
+  return { quoteDate: '2024-02-28', rateNumeratorMicro: three ? '3002000000' : '2001000000', rateDenominator: sells.length, meanRate: three ? '1000.666667' : '1000.500000', arsCents: three ? '1050700' : '1050525', quotes: sells.map((sell, i) => ({ ...sources[i]!, quoteDate: '2024-02-28', sell, observedAt: '2024-02-29T12:00:00Z' })) };
 }
 async function fixture(t: { after(fn: () => Promise<void>): void }) {
   const client = new PGlite();
@@ -111,6 +116,40 @@ test('correction retains FX only for nonmonetary changes, fresh evidence and cur
   assert.equal(amountChanged.conversion,null);
   const ars = await repo.correct({ownerId:'123',id:saved.id,expectedVersion:5,patch:{currency:'ARS'}});
   assert.equal(ars.arsAmount,'20.00'); assert.equal(ars.conversion,null);
+});
+
+test('forged source bindings reject registration and correction without public state changes', async t => {
+  const cases: Array<[string, number, Partial<FxEvidence['quotes'][number]>]> = [
+    ['unknown portal',0,{portal:'Other'}],
+    ['portal case mismatch',0,{portal:'dolarapi'}],
+    ['known name wrong URL',0,{sourceUrl:'https://example.com/official'}],
+    ['same source under two names',1,{sourceUrl:'https://dolarapi.com/v1/dolares/oficial'}],
+    ['wrong historical date',2,{sourceUrl:'https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial/2024/02/27'}],
+    ['HTTP',0,{sourceUrl:'http://dolarapi.com/v1/dolares/oficial'}],
+    ['credentials',0,{sourceUrl:'https://user:password@dolarapi.com/v1/dolares/oficial'}],
+    ['spoofed subdomain',0,{sourceUrl:'https://dolarapi.com.evil.example/v1/dolares/oficial'}],
+    ['userinfo host spoof',0,{sourceUrl:'https://dolarapi.com@evil.example/v1/dolares/oficial'}],
+    ['extra query',0,{sourceUrl:'https://dolarapi.com/v1/dolares/oficial?x=1'}],
+    ['fragment',0,{sourceUrl:'https://dolarapi.com/v1/dolares/oficial#official'}],
+    ['port',0,{sourceUrl:'https://dolarapi.com:443/v1/dolares/oficial'}],
+    ['wrong history query',1,{sourceUrl:'https://api.bluelytics.com.ar/v2/evolution.json?days=6'}],
+    ['duplicate history query',1,{sourceUrl:'https://api.bluelytics.com.ar/v2/evolution.json?days=512&days=512'}],
+    ['history fragment',2,{sourceUrl:'https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial/2024/02/28#x'}],
+    ['duplicate portal',1,{portal:'DolarAPI',sourceUrl:'https://dolarapi.com/v1/dolares/oficial'}],
+  ];
+  for (const [name,index,patch] of cases) await t.test(name,async sub => {
+    const repo = await fixture(sub);
+    const saved = await repo.register({...input,currency:'USD'});
+    const before = await repo.list({ownerId:input.ownerId});
+    const beforeAudit = await repo.revisions({ownerId:input.ownerId,id:saved.id});
+    const conversion = evidence(true);
+    Object.assign(conversion.quotes[index]!,patch);
+    await assert.rejects(repo.register({...input,sourceKey:'forged',currency:'USD',conversion}),error('validation'));
+    await assert.rejects(repo.correct({ownerId:input.ownerId,id:saved.id,expectedVersion:1,patch:{description:'forged'},conversion}),error('validation'));
+    assert.deepEqual(await repo.get({ownerId:input.ownerId,id:saved.id}),saved);
+    assert.deepEqual(await repo.list({ownerId:input.ownerId}),before);
+    assert.deepEqual(await repo.revisions({ownerId:input.ownerId,id:saved.id}),beforeAudit);
+  });
 });
 
 test('half-up conversion and full-filter totals despite page limit', async t => {

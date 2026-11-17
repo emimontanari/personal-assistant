@@ -41,10 +41,15 @@ export function conversion(amount: bigint, currency: 'ARS' | 'USD', expenseDate:
   let sum = 0n;
   for (const q of fx.quotes) {
     valid(q && typeof q === 'object');
-    const portal = text(q.portal,100).trim().toLowerCase(); valid(!portals.has(portal)); portals.add(portal);
+    const portal = text(q.portal,100); valid(!portals.has(portal)); portals.add(portal);
     valid(date(q.quoteDate) === fx.quoteDate);
-    const url = text(q.sourceUrl,2048);
-    try { const parsed = new URL(url); valid(parsed.protocol === 'https:' && !parsed.username && !parsed.password); } catch { throw new ExpenseError('validation'); }
+    // Match the fixed adapters exactly, not URL-normalized lookalikes. This binds
+    // expected provenance, not cryptographic authenticity of the reported quote.
+    const expectedUrl = portal === 'DolarAPI' ? 'https://dolarapi.com/v1/dolares/oficial'
+      : portal === 'Bluelytics' ? 'https://api.bluelytics.com.ar/v2/evolution.json?days=512'
+      : portal === 'ArgentinaDatos' ? `https://api.argentinadatos.com/v1/cotizaciones/dolares/oficial/${fx.quoteDate.replaceAll('-','/')}`
+      : null;
+    valid(expectedUrl !== null && text(q.sourceUrl,2048) === expectedUrl);
     valid(typeof q.observedAt === 'string' && q.observedAt.length <= 40 && /^\d{4}-\d{2}-\d{2}T/.test(q.observedAt) && Number.isFinite(Date.parse(q.observedAt)));
     sum += decimal(q.sell,6);
   }
