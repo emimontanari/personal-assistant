@@ -5,6 +5,7 @@ import { stepCountIs, type LanguageModel } from 'ai'
 import { INSTRUCTIONS, instructionsForTurn, modelId } from '../ai/assistant.js'
 import { createFirecrawlTools, firecrawlRuntime, type FirecrawlRuntime } from '../ai/firecrawl-tools.js'
 import { configuredOwner, createExpenseTools, expenseRuntime, expensesAvailable, type ExpenseRuntime } from '../ai/expense-tools.js'
+import { expensePermission } from '../ai/expense-intent.js'
 import { sendTelegramReply } from '../telegram/api.js'
 import { inboundText, type TelegramUpdate } from '../telegram/update.js'
 
@@ -67,12 +68,16 @@ export function createTelegramAssistant<TId extends string>(
       const available = Boolean(web.getKey())
       const env = expenses.getEnv()
       const financial = expensesAvailable(env, chatId)
-      const stamp = Object.freeze({ ownerId: configuredOwner(env.TELEGRAM_OWNER_ID)!, chatId, runId: ctx.run.id, capability })
+      // Snapshot only the latest USER text before the model or any web tool runs.
+      const permission = expensePermission(messages)
+      const stamp = Object.freeze({ ownerId: configuredOwner(env.TELEGRAM_OWNER_ID)!, chatId, runId: ctx.run.id, capability, permission })
       const options = {
         model: model(),
         messages,
         instructions: instructionsForTurn(now(), available, financial),
         abortSignal: signal,
+        activeTools: (Object.keys(tools) as Array<keyof typeof tools>).filter(name =>
+          (name !== 'registrarGasto' || permission === 'register') && (name !== 'corregirGasto' || permission === 'correct')),
         stopWhen: stepCountIs(5),
         // gpt-5-nano is a reasoning model: the lowest effort keeps billed tokens down.
         providerOptions: { openai: { reasoningEffort: 'minimal' } },

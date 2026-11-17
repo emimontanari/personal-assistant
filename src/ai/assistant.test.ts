@@ -7,6 +7,7 @@ describe('temporal search instructions', () => {
   it('states expense consent, currency, timezone, evidence and truthful confirmation contracts', () => {
     for (const rule of ['registrarGasto', 'consultarGastos', 'corregirGasto', 'ARS', 'USD', 'America/Argentina/Buenos_Aires', 'no infieras USD', 'No afirmes que guardaste', 'expectedVersion', 'pendiente', 'indicativa', 'páginas web']) assert.ok(assistant.INSTRUCTIONS.includes(rule), rule)
     assert.ok(assistant.instructionsForTurn(new Date('2024-03-02T01:00:00Z'), false, false).includes('Gastos no disponibles'))
+    for (const rule of ['último mensaje del usuario', 'un «sí» aislado no autorizan escrituras', 'no heredes permiso del historial', 'unauthorized', 'pedí una instrucción explícita nueva']) assert.ok(assistant.INSTRUCTIONS.includes(rule), rule)
   })
   it('formats the supplied instant as a UTC date, without freezing it at import time', () => {
     const first = assistant.instructionsForTurn(new Date('2042-01-01T00:30:00+02:00'))

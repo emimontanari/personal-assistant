@@ -14,7 +14,9 @@ Tracking bootstrap only: this document authorizes no source implementation, publ
 - T1 — DONE (`54fec7b`): expense domain, Drizzle/Postgres persistence, and SQL migration; parent reports 8 isolated PGlite tests exercising the exact migration SQL; schema not applied live (S1, S2).
 - T2 — DONE (`0c3f394`): fixed official-rate adapters, exact decimal mean, same-date/latest-prior selection and pending conversion; parent reports 17 mocked FX tests (S2, S3).
 - T3 — SOURCE IMPLEMENTED (`e210e0b5e7ba2e7da929eaf1571950f97c277b91`, domain owner get `3231b42`): owner-gated text tools and docs; managed AI SDK 7 `toolsContext` with per-tool `contextSchema` forwarding works, with the negative `runtimeContext`-only probe preserved; writer and parent report 90/90 local tests, both TypeScript checks, and Trigger `--dry-run` passing; independent proof and authorized activation remain outstanding (S1–S3; preserve S4 exclusions).
-- T4 — BLOCKED, NOT DONE: independent verification of fixed candidate `e210e0b5e7ba2e7da929eaf1571950f97c277b91` stopped during mandatory preparation, before any independent tests; safe preparation needs explicit human approval before one bounded verification attempt; full-candidate native review has not started, and overall feature completion awaits T4 proof and authorized activation (S1–S4).
+- T5 — LOCALLY DONE, ROUND 1: source and tests address L8's three issues through exact portal evidence bindings, trusted latest-user action permission with executor guards, and protected PostgreSQL timeouts; parent reports 141/141 tests, both TypeScript checks, and whitespace checks passing; round 2 unused, independent proof pending (S1–S3).
+- T6 — DONE, PREREQUISITES: safe regular-file dependency payload prepared at `.trigger/verifier-expenses-deps/node_modules`, 235407044 bytes, 15315 regular files, zero symlinks and environment/secret filenames; mandatory preparer/helper checks unchanged (S1–S3).
+- T4 — IN PROGRESS, PREPARED, NOT PASSED: T5 local corrections and T6 payload prerequisites are ready, but the one human-authorized NEW independent attempt has not launched; parent will supply corrected commit binding; previous preparation failure ran zero independent tests and remains L7 history, native review is separately bound and not started, budgets are not reset, and database activation/publishing remain unauthorized (S1–S4).
 
 ## Log
 
@@ -90,16 +92,44 @@ These observations were supplied by the parent and were not independently fetche
 - Zero independent tests ran. No isolated scratch directory or payload was created. Only the existing untracked, ignored `prepare.py` helper remains, as reported by the parent; this tracking writer does not alter it.
 - This is a preparation failure, not evidence that verifier capability is unavailable or an upgrade is needed. T4 is blocked, not done. Full-candidate native review has not started; no native budgets have been opened. Earlier native assessment in L5 is not full-candidate review or approval.
 
-### L8 — Static observations pending technical work/review
+### L8 — Historical static observations; local correction evidence in L11
 
-These are parent-supplied static observations, not reproduced blockers, exploit demonstrations, or approval dispositions.
+These were initially parent-supplied static observations, not reproduced blockers, exploit demonstrations, or approval dispositions. L11 records subsequent offline reproduction and local corrections; independent review remains outstanding.
 
 1. Evidence validation checks arithmetic but does not establish portal-allowlist authenticity.
 2. The capability authenticates the owner, not explicit current-user intent. Web prompt injection leading to expense writes remains unproven; owner authentication alone does not prove intent authorization.
 3. PostgreSQL has a connection-acquisition timeout but no statement/query timeout.
 
-### L9 — Bounded continuation proposal; not authorization
+### L9 — Historical bounded continuation proposal; authorization subsequently recorded in L10
 
 - Parent may offer the same implementation writers narrowly scoped continuation for the three static findings in L8, with exact edit surfaces, correction limits, and focused checks explicitly authorized before work. Keep these findings pending until technical disposition and evidence exist; do not weaken checks.
 - Human approval is required for a repaired safe preparation plan that excludes environment files, handles the rejected symlinks without weakening mandatory checks, and stays within the 256 MiB cap. Only after safe preparation is repaired and approved may one bounded independent-verifier attempt run; no automatic retries or silent candidate rebinding.
 - The parent retains candidate binding, review disposition, and activation decisions. Do not reset native budgets (none have been opened), treat local checks as independent proof, claim approval, publish, or apply a live schema. Future stages remain deferred, not obsolete.
+
+### L10 — Explicit acceptance of bounded engineering continuation
+
+Full parent proposal, verbatim:
+> Propongo una continuación acotada: corregir esos puntos con los mismos writers —máximo dos rondas—, preparar dependencias aisladas sin archivos de entorno ni enlaces y realizar un nuevo intento de verificación independiente.
+
+Latest user reply, verbatim:
+> si
+
+- This reply explicitly accepts the quoted engineering continuation, not new product requirements or changes to S1–S4. T5 is limited to the three static issues in L8: portal-allowlist evidence validity; trusted current-user intent for expense writes versus scraped content; and SQL statement/query timeout. The same source writers retain their ownership split on disjoint edit surfaces, with a maximum of two correction rounds; no broader source changes are authorized by this acceptance.
+- T6 must produce isolated regular-file dependencies with no environment files or links and a payload no larger than 256 MiB. T4 follows T5 and T6: one new independent attempt only after payload prerequisites are repaired. The previous zero-test preparation failure remains evidence, not a completed verification or a budget reset. No automatic further attempts or weakening of checks is authorized.
+- The parent confirms all prior child tasks completed before continuation; this lifecycle confirmation does not mean T4 verification completed. The parent owns the task-status map and its visible projection. This tracking update precedes resumed source writes and performs none itself.
+- The parent must explicitly bind the corrected verification candidate; native review requires its own separate binding and has not started. No native budgets have been opened or reset. Overall feature status remains INCOMPLETE pending independent proof and separately authorized activation. The reply does not authorize live database activation, schema application, data writes, publishing, or commits by this tracking writer. Future stages remain deferred, not obsolete.
+
+### L11 — Parent-reported T5 round 1 local completion
+
+- Round 1 source and tests address only the three authorized issues. Round 2 is unused; this local completion does not reset any correction or native-review budget.
+- Portal evidence now validates exact DolarAPI, Bluelytics, and ArgentinaDatos bindings, including quote-date URL validation.
+- PostgreSQL statement and idle timeouts are protected at 5 seconds, with query timeout at 6 seconds; URL override bypass is closed.
+- Actual offline prompt-injection RED evidence persisted an unwanted expense and changed an existing record. This supersedes L8's initially unproven status for that offline scenario; it is not evidence of a production exploit. Latest trusted-user action permission plus checks inside each executor now deny those injected writes, leaving public records, audit history, and counters unchanged.
+- Parent reports the full local suite passing 141/141, both TypeScript checks passing, and whitespace checks passing. Exact command lines were not supplied in this tracking update; these are parent-reported results, not tests rerun by this documentation writer or independent verification.
+
+### L12 — Parent-reported T6 safe payload and T4 readiness
+
+- Payload: `.trigger/verifier-expenses-deps/node_modules`, exactly 235407044 bytes, 15315 regular files, zero symlinks, and zero environment/secret filenames. Of these files, 15299 match source hashes and 16 are regular executable bin wrappers. PGlite WASM and native TypeScript dependencies are retained; only source maps and the Firecrawl environment example were excluded. Shell-wrapper help/version checks pass.
+- Native preparer and helper checks were not altered or weakened. This completed payload supersedes the earlier preparation estimate, not the historical failed attempt: L7's exit 1 and zero independent tests remain recorded. This documentation writer neither inspected payload contents nor modified the payload.
+- T4 is in progress/prepared, not passed. The new independent attempt has not launched. The human already authorized one attempt after repair in L10; the parent will supply the corrected commit binding before launch. No additional attempt, automatic rerun, candidate rebinding, or budget reset is implied.
+- Native review remains separate, separately bound, and not started. Overall feature completion remains outstanding. No production publishing, live database migration, live data writes, or secret changes occurred or are authorized by this tracking update; exact user quotations and deferred future scope remain unchanged.

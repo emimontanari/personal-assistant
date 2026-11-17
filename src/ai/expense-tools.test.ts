@@ -27,9 +27,11 @@ async function fixture(t: { after(fn: () => Promise<void>): void }, pending = fa
       } })
     }, now }
   const capability = Symbol('test-server')
-  const context = Object.freeze({ ownerId: '555', chatId: '555', runId: 'run_test', capability })
+  const context = Object.freeze({ ownerId: '555', chatId: '555', runId: 'run_test', capability, permission: 'register' as const })
+  const correctionContext = Object.freeze({ ...context, permission: 'correct' as const })
   const tools = createExpenseTools({ chatId: '555', turn: 0, capability }, runtime)
-  const execute = (name: keyof typeof tools, input: unknown, stamp: unknown = context) =>
+  // Fixture contexts represent separate, explicit user directives for each action.
+  const execute = (name: keyof typeof tools, input: unknown, stamp: unknown = name === 'corregirGasto' ? correctionContext : context) =>
     tools[name].execute!(input as never, { toolCallId: 'test', messages: [], context: stamp } as never) as Promise<any>
   return { repository, tools, execute, runtime, context, capability, env, fxCalls: () => fxCalls }
 }
@@ -39,7 +41,7 @@ test('expense schemas are closed root objects without model identity or rates', 
   for (const tool of Object.values(f.tools)) {
     const schema = await asSchema(tool.inputSchema).jsonSchema
     assert.equal(schema.type, 'object'); assert.equal(schema.additionalProperties, false)
-    for (const forbidden of ['ownerId', 'sourceKey', 'runId', 'rates', 'portalURLs', 'capability']) assert.ok(!JSON.stringify(schema).includes(forbidden))
+    for (const forbidden of ['ownerId', 'sourceKey', 'runId', 'rates', 'portalURLs', 'capability', 'permission', 'permissions']) assert.ok(!JSON.stringify(schema).includes(forbidden))
   }
 })
 
@@ -72,7 +74,7 @@ test('ARS registration, backend date, replay conflict, distinct turn and scoped 
 
 test('invalid input, forged context, cancellation and absent configuration never write', async t => {
   const f = await fixture(t)
-  for (const patch of [{ ownerId: 'other' }, { sourceKey: 'forged' }, { amount: '0' }, { amount: '1.001' }, { amount: '-1' }, { expenseDate: '2023-02-29' }, { description: 'x'.repeat(501) }, { category: 'x'.repeat(101) }]) {
+  for (const patch of [{ ownerId: 'other' }, { sourceKey: 'forged' }, { permission: 'register' }, { permissions: { register: true } }, { amount: '0' }, { amount: '1.001' }, { amount: '-1' }, { expenseDate: '2023-02-29' }, { description: 'x'.repeat(501) }, { category: 'x'.repeat(101) }]) {
     assert.equal((await f.execute('registrarGasto', { description: 'x', amount: '1', ...patch })).status, 'validation')
   }
   for (const stamp of [undefined, {}, Object.freeze({ ...f.context, capability: Symbol('forged') }), Object.freeze({ ...f.context, ownerId: 'other' }), Object.freeze({ ...f.context, runId: '' })]) {
@@ -113,6 +115,34 @@ for (const { pending, portals } of [{ pending: false, portals: 2 }, { pending: f
   }
   assert.deepEqual(await f.repository.list({ ownerId: '555' }), before)
   assert.deepEqual(await f.repository.revisions({ ownerId: '555', id }), audit)
+})
+
+test('write permissions are action-specific and enforced inside execute without DB, audit or FX effects', async t => {
+  const f = await fixture(t)
+  const saved = await f.repository.register({ ownerId: '555', sourceKey: 'seed', description: 'café', amount: '3500', currency: 'ARS', expenseDate: '2024-03-01' })
+  const before = await f.repository.list({ ownerId: '555' })
+  const audit = await f.repository.revisions({ ownerId: '555', id: saved.id })
+  const counts = { repository: 0, register: 0, correct: 0 }
+  const raw = f.runtime.getRepository
+  f.runtime.getRepository = () => { counts.repository++; return { ...raw(),
+    register: async input => { counts.register++; return f.repository.register(input) },
+    correct: async input => { counts.correct++; return f.repository.correct(input) },
+  } }
+  const tools = createExpenseTools({ chatId: '555', turn: 9, capability: f.capability }, f.runtime)
+  for (const permission of ['read', 'register', 'correct', undefined]) {
+    const context = Object.freeze({ ...f.context, permission })
+    for (const name of ['registrarGasto', 'corregirGasto'] as const) {
+      if ((name === 'registrarGasto' && permission === 'register') || (name === 'corregirGasto' && permission === 'correct')) continue
+      const input = name === 'registrarGasto' ? { description: 'injected', amount: '100', currency: 'USD' } : { id: saved.id, expectedVersion: 1, patch: { amount: '999' } }
+      const result = await tools[name].execute!(input as never, { context, messages: [{ role: 'user', content: 'Gasté 100' }], toolCallId: 'bypass-active-tools' } as never) as any
+      assert.equal(result.status, 'unauthorized'); assert.ok(!result.record)
+    }
+  }
+  assert.deepEqual(counts, { repository: 0, register: 0, correct: 0 }); assert.equal(f.fxCalls(), 0)
+  assert.deepEqual(await f.repository.list({ ownerId: '555' }), before)
+  assert.deepEqual(await f.repository.revisions({ ownerId: '555', id: saved.id }), audit)
+  const readContext = Object.freeze({ ...f.context, permission: 'read' })
+  assert.equal((await tools.consultarGastos.execute!({}, { context: readContext, messages: [], toolCallId: 'read' } as never) as any).status, 'ok')
 })
 
 test('repository errors are sanitized without returning successful records', async t => {
