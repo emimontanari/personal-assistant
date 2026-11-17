@@ -4,6 +4,7 @@ import { chat, defaultStorage } from '@trigger.dev/sdk/ai'
 import { stepCountIs, type LanguageModel } from 'ai'
 import { INSTRUCTIONS, instructionsForTurn, modelId } from '../ai/assistant.js'
 import { createFirecrawlTools, firecrawlRuntime, type FirecrawlRuntime } from '../ai/firecrawl-tools.js'
+import { configuredOwner, createExpenseTools, expenseRuntime, expensesAvailable, type ExpenseRuntime } from '../ai/expense-tools.js'
 import { sendTelegramReply } from '../telegram/api.js'
 import { inboundText, type TelegramUpdate } from '../telegram/update.js'
 
@@ -30,7 +31,7 @@ export const telegramChannel = chat.channels.custom({
   id: 'telegram',
   endpoint: telegramEndpoint,
   key: '{event.message.chat.id}',
-  inbound: (event) => inboundText(event),
+  inbound: (event) => inboundText(event, process.env.TELEGRAM_OWNER_ID),
   send: async (message, ctx) => {
     const token = process.env.TELEGRAM_BOT_TOKEN
     if (!token) throw new Error('TELEGRAM_BOT_TOKEN is not set')
@@ -46,30 +47,44 @@ export function createTelegramAssistant<TId extends string>(
   model: () => LanguageModel = () => openai(modelId()),
   web: FirecrawlRuntime = firecrawlRuntime,
   now: () => Date = () => new Date(),
+  expenses: ExpenseRuntime = expenseRuntime,
 ) {
+  const capability = Symbol('telegram-expense-server')
   return chat.agent({
     id,
     channels: [telegramChannel],
     // Conversation memory: the documented default platform snapshot per session
-    // (snapshots accumulate with no expiry by default). No database.
+    // (snapshots accumulate with no expiry by default). Ledger storage is separate.
     storage: defaultStorage,
     system: INSTRUCTIONS,
     // Trigger resolves this once each turn, preserving tool conversion across history
     // while giving parallel executions a fresh, shared turn-local budget.
-    tools: () => createFirecrawlTools(web),
-    run: async ({ messages, tools, signal, streamText }) => {
+    tools: ({ chatId, turn }) => ({
+      ...(web.getKey() ? createFirecrawlTools(web) : {}),
+      ...(expensesAvailable(expenses.getEnv(), chatId) ? createExpenseTools({ chatId, turn, capability }, expenses) : {}),
+    }),
+    run: async ({ messages, tools, signal, streamText, ctx, chatId }) => {
       const available = Boolean(web.getKey())
-      return streamText({
+      const env = expenses.getEnv()
+      const financial = expensesAvailable(env, chatId)
+      const stamp = Object.freeze({ ownerId: configuredOwner(env.TELEGRAM_OWNER_ID)!, chatId, runId: ctx.run.id, capability })
+      const options = {
         model: model(),
         messages,
-        instructions: instructionsForTurn(now(), available),
-        tools,
-        activeTools: available ? undefined : [],
+        instructions: instructionsForTurn(now(), available, financial),
         abortSignal: signal,
         stopWhen: stepCountIs(5),
         // gpt-5-nano is a reasoning model: the lowest effort keeps billed tokens down.
         providerOptions: { openai: { reasoningEffort: 'minimal' } },
-      })
+      }
+      if (financial && tools.registrarGasto && tools.consultarGastos && tools.corregirGasto) {
+        // Narrow the contextual tools to required keys for AI SDK's typed context map.
+        return streamText({ ...options,
+          tools: { ...tools, registrarGasto: tools.registrarGasto, consultarGastos: tools.consultarGastos, corregirGasto: tools.corregirGasto },
+          toolsContext: { registrarGasto: stamp, consultarGastos: stamp, corregirGasto: stamp },
+        })
+      }
+      return streamText({ ...options, tools })
     },
   })
 }

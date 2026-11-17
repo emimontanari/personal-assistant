@@ -14,6 +14,27 @@ Telegram → endpoint webhook `telegram` → chat.agent `telegram-assistant` (un
 - Los updates sin texto (foto, sticker, etc.) no generan respuesta. Las respuestas de más de 4096 caracteres se envían en varios mensajes.
 - [Hono](https://hono.dev) en Railway solo sirve `GET /` (`src/app.ts`). Ya no existe `POST /telegram/webhook`.
 
+## Gastos personales por texto (etapa inicial)
+
+Tres tools en Trigger.dev, no en Hono: `registrarGasto`, `consultarGastos` y `corregirGasto`. Requieren **`TELEGRAM_OWNER_ID` y `DATABASE_URL`** en el entorno de Trigger.dev. Configurá el propietario **antes de usar datos financieros**: es el ID numérico positivo de Telegram `message.from.id`, no el username. Con propietario configurado solo se aceptan mensajes de ese remitente en su chat privado con el mismo ID; grupos, otros usuarios y mensajes sin remitente se descartan antes del modelo. Un ID configurado inválido también bloquea la entrada. Sin propietario se conserva el chat general/web, pero no se ofrecen tools de gastos ni se permiten escrituras; sin DB tampoco se habilitan gastos.
+
+- “Gasté 3500 en café” ⇒ ARS 3500.00 por defecto. Solo USD explícito: no se infiere la moneda por el nombre de un producto.
+- “Gasté USD100 en GTA6” ⇒ conserva USD 100.00 y muestra ARS **indicativo** si hay evidencia, junto con la fecha de cotización y las fuentes guardadas; no hay tasa fija ni liquidación de tarjeta garantizada.
+- Importe decimal positivo de hasta dos decimales, descripción de hasta 500 caracteres, categoría opcional de hasta 100. Si faltan datos o son ambiguos el agente pregunta; datos claros se guardan mediante la tool, un gasto por turno. Fecha omitida: hoy en `America/Argentina/Buenos_Aires`; fechas explícitas reales `YYYY-MM-DD`. Para semanas/meses se usan límites `from`/`to` inclusivos en esa zona.
+- Consulta sin fechas: primeros 20 registros por fecha ascendente (límite configurable 1–100), con total ARS de **todo** el intervalo, no solo la página. Las conversiones pendientes se cuentan aparte y no se suman como ARS inventado. Para corregir se consulta y selecciona un UUID y su versión; una selección ambigua se pregunta y una versión desactualizada da conflicto. Hay historial de revisiones; no hay eliminación.
+
+La conversión usa la media aritmética exacta de dos o tres portales comparables del **dólar oficial vendedor**, todos de la misma fecha: DolarAPI, fuente `Oficial` de Bluelytics y ArgentinaDatos. Si no alcanza evidencia del día del gasto se busca la última fecha anterior disponible y se indica que **no es la fecha del gasto**; nunca se usa una fecha posterior. Con menos de dos cotizaciones válidas se guarda USD con conversión pendiente, sin fabricar ARS. Se conservan importe/moneda original, ARS, fecha, media y evidencia con fuentes y observación. Cambiar importe/moneda/fecha vuelve a consultar la conversión con los campos finales; cambiar solo descripción/categoría conserva la evidencia.
+
+Límites del servicio de cotización: hasta 512 filas de historial, cinco fechas candidatas y siete requests por conversión, timeout total 15 s y 5 s por request, sin reintentos ni URLs/tasas suministradas por el modelo. No garantiza cobertura histórica completa: fuera del historial solo puede probar la fecha exacta en ArgentinaDatos. Firecrawl no es la fuente numérica canónica del cambio.
+
+Identidad y origen los fija el backend: contexto server-only por tool (`toolsContext` + `contextSchema`), remitente validado antes del turno y clave `${run.id}:${turn}:register`. El webhook deduplica `update_id`; la base impide dos altas para la misma clave. En el mismo turno, repetir el mismo payload comparte resultado; uno distinto da conflicto. La garantía está **acotada a la misma run/turn/sourceKey**, no es exactly-once entre cualquier reinicio o redelivery. En un retry con nueva evidencia USD puede haber conflicto en lugar de una segunda alta. Otro turno permite repetir un gasto genuino. Los errores se devuelven con códigos saneados; nunca se debe afirmar que se guardó sin resultado exitoso. Las pruebas con modelos offline verifican el cableado, no decisiones semánticas reales.
+
+Persistencia: Postgres con Drizzle, conexión perezosa; importar/iniciar el agente **no conecta ni migra**. La memoria del chat no cambia y no es el libro de gastos. Fotos de tickets, voz, CRM, calendario y listas de supermercado quedan para etapas posteriores.
+
+### Migraciones: manuales y pendientes de aprobación
+
+El SQL está en `drizzle/`; las pruebas locales usan PGlite aislado en memoria, sin tocar una DB real. **No se aplicó ninguna migración.** No ejecutar `npx drizzle-kit migrate` hasta que el usuario apruebe la DB/rama de desarrollo destino y, para producción real, exista aprobación explícita y backup. La configuración está en `drizzle.config.ts`; esa CLI toma `DATABASE_URL`. El runtime no aplica migraciones y no se agregaron scripts que las ejecuten. La activación con propietario y DB reales sigue pendiente; no hubo push ni deploy.
+
 ## Herramientas web por intención
 
 Las skills de `.agents/skills/` guían a quienes programan; no son herramientas ejecutables ni se copian al prompt. El bot tiene cinco tools reales AI SDK en `src/ai/firecrawl-tools.ts`, registradas en `chat.agent` y reenviadas desde su `run` al `streamText` administrado por Trigger.dev:
@@ -46,7 +67,7 @@ Las pruebas son offline, con clientes inyectados y modelos deterministas multist
 
 ## Memoria de la conversación
 
-Cada chat de Telegram conserva su propio historial gracias al *transcript storage* por defecto de `chat.agent` (`storage: defaultStorage`): un snapshot por sesión en el almacenamiento de objetos de Trigger.dev. No hay base de datos ni infraestructura extra; una run nueva retoma desde el snapshot.
+Cada chat de Telegram conserva su propio historial gracias al *transcript storage* por defecto de `chat.agent` (`storage: defaultStorage`): un snapshot por sesión en el almacenamiento de objetos de Trigger.dev. El historial no usa la base de gastos ni infraestructura extra; una run nueva retoma desde el snapshot. El libro de gastos habilitado por separado sí requiere Postgres.
 
 Límites documentados:
 
@@ -59,6 +80,8 @@ Límites documentados:
 | `TELEGRAM_BOT_TOKEN` | Entorno de Trigger.dev | Token del bot (@BotFather). |
 | `OPENAI_API_KEY` | Entorno de Trigger.dev | API key de OpenAI; la lee `@ai-sdk/openai`. |
 | `AI_MODEL` | Entorno de Trigger.dev | Opcional. Por defecto `gpt-5-nano`. |
+| `TELEGRAM_OWNER_ID` | Entorno de Trigger.dev | ID numérico positivo `from.id` del único propietario; requiere chat privado del mismo ID. Necesario para gastos. |
+| `DATABASE_URL` | Entorno de Trigger.dev | Conexión Postgres para gastos; necesaria junto al propietario. Conexión perezosa, sin migraciones automáticas. Nunca publicar el valor. |
 | `FIRECRAWL_API_KEY` | `.env` local (Development) / variables de Trigger.dev (Production) | Habilita las consultas web; opcional para conversar sin web. No configurar ni sincronizar en Railway. |
 | `TELEGRAM_WEBHOOK_SECRET` | Local / tu terminal | Secreto de firma del endpoint `telegram`, también enviado a Telegram como `secret_token`. |
 

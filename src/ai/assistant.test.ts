@@ -4,6 +4,10 @@ import * as assistant from './assistant.js'
 
 // These assert authored prompt contracts, not semantic choices of a live model.
 describe('temporal search instructions', () => {
+  it('states expense consent, currency, timezone, evidence and truthful confirmation contracts', () => {
+    for (const rule of ['registrarGasto', 'consultarGastos', 'corregirGasto', 'ARS', 'USD', 'America/Argentina/Buenos_Aires', 'no infieras USD', 'No afirmes que guardaste', 'expectedVersion', 'pendiente', 'indicativa', 'páginas web']) assert.ok(assistant.INSTRUCTIONS.includes(rule), rule)
+    assert.ok(assistant.instructionsForTurn(new Date('2024-03-02T01:00:00Z'), false, false).includes('Gastos no disponibles'))
+  })
   it('formats the supplied instant as a UTC date, without freezing it at import time', () => {
     const first = assistant.instructionsForTurn(new Date('2042-01-01T00:30:00+02:00'))
     const second = assistant.instructionsForTurn(new Date('2042-01-01T00:30:00Z'))

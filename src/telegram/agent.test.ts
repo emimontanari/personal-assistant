@@ -1,8 +1,15 @@
 // Import order matters: the test harness installs the resource catalog before agents register.
 import { mockChatAgent } from '@trigger.dev/sdk/ai/test'
 import assert from 'node:assert/strict'
-import { afterEach, describe, it, mock } from 'node:test'
-import { simulateReadableStream } from 'ai'
+import { afterEach, beforeEach, describe, it } from 'node:test'
+import { readFile } from 'node:fs/promises'
+import { PGlite } from '@electric-sql/pglite'
+import { drizzle } from 'drizzle-orm/pglite'
+import { createExpenseRepository } from '../expenses/repository.js'
+import type { ExpenseRuntime } from '../ai/expense-tools.js'
+import { simulateReadableStream, tool, stepCountIs } from 'ai'
+import { chat } from '@trigger.dev/sdk/ai'
+import { z } from 'zod'
 import { MockLanguageModelV4 } from 'ai/test'
 import { createTelegramAssistant, telegramChannel } from '../trigger/telegram.js'
 import type { FirecrawlRuntime } from '../ai/firecrawl-tools.js'
@@ -36,13 +43,85 @@ const update = (id: number, chatId: number, text?: string) => ({
 
 let n = 0
 const realFetch = globalThis.fetch
-
+let previousEnv: { token?: string; owner?: string }
+beforeEach(() => {
+  previousEnv = { token: process.env.TELEGRAM_BOT_TOKEN, owner: process.env.TELEGRAM_OWNER_ID }
+  delete process.env.TELEGRAM_OWNER_ID
+})
 afterEach(() => {
   globalThis.fetch = realFetch
-  delete process.env.TELEGRAM_BOT_TOKEN
+  for (const [name, value] of [['TELEGRAM_BOT_TOKEN', previousEnv.token], ['TELEGRAM_OWNER_ID', previousEnv.owner]]) {
+    if (value === undefined) delete process.env[name!]
+    else process.env[name!] = value
+  }
 })
 
 describe('telegram assistant agent', () => {
+  for (const explicitToolContext of [false, true]) it(`managed streamText ${explicitToolContext ? 'forwards explicit toolsContext' : 'does not implicitly forward runtimeContext'}`, async () => {
+    const capability = Symbol('server-only')
+    const contexts: unknown[] = []
+    const expected: object[] = []
+    let step = 0
+    const textModel = modelWithText('context verified')
+    const model = new MockLanguageModelV4({ doStream: async (options) => {
+      if (step++ % 2 !== 0) return textModel.doStream(options)
+      return { stream: simulateReadableStream({ chunks: [
+        { type: 'tool-call', toolCallId: `context-${step}`, toolName: 'probeContext', input: '{}' },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage: {
+          inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 1, text: 0, reasoning: undefined },
+        } },
+      ] }) }
+    } })
+    const agent = chat.agent({
+      id: `runtime-context-proof-${++n}`,
+      tools: () => ({
+        probeContext: tool({
+          inputSchema: z.strictObject({}),
+          contextSchema: z.custom<unknown>(),
+          execute: async (_input, { context }) => {
+            contexts.push(context)
+            // Fail closed: runtimeContext alone does not authorize an expense write.
+            if (context !== undefined) {
+              assert.equal((context as any).runId, 'run_expense_context_proof')
+              assert.equal((context as any).ownerId, '555')
+              assert.equal((context as any).capability, capability)
+            }
+            return { status: context === undefined ? 'unavailable' : 'verified' }
+          },
+        }),
+      }),
+      run: async ({ messages, tools, signal, streamText, ctx, chatId }) => {
+        const runtimeContext = Object.freeze({ ownerId: '555', chatId, runId: ctx.run.id, capability })
+        expected.push(runtimeContext)
+        return streamText({ model, messages, tools, abortSignal: signal, runtimeContext,
+          ...(explicitToolContext ? { toolsContext: { probeContext: runtimeContext } } : {}),
+          stopWhen: stepCountIs(2) })
+      },
+    })
+    const harness = mockChatAgent(agent, {
+      chatId: '555',
+      clientData: { ownerId: 'forged', runId: 'forged', turn: 999 },
+      taskContext: { ctx: { run: { id: 'run_expense_context_proof' } } },
+    })
+    try {
+      for (const id of ['proof-1', 'proof-2']) {
+        await harness.sendMessage({ id, role: 'user', parts: [{ type: 'text', text: 'probe' }] })
+      }
+    } finally { await harness.close() }
+    assert.equal(contexts.length, 2)
+    assert.equal(expected.length, 2)
+    if (explicitToolContext) contexts.forEach((context, i) => assert.equal(context, expected[i]))
+    else assert.deepEqual(contexts, [undefined, undefined])
+    expected.forEach(context => assert.ok(Object.isFrozen(context)))
+    assert.notEqual(expected[0], expected[1])
+    assert.equal(model.doStreamCalls.length, 4)
+    for (const call of [model.doStreamCalls[1], model.doStreamCalls[3]]) {
+      assert.ok(JSON.stringify(call.prompt).includes(explicitToolContext ? 'verified' : 'unavailable'))
+      assert.ok(!JSON.stringify(call.prompt).includes('run_expense_context_proof'))
+    }
+  })
+
   it('answers a Telegram text update and posts the reply with sendMessage', async () => {
     process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
     const sent: { url: string; body: { chat_id: number; text: string } }[] = []
@@ -224,6 +303,112 @@ describe('telegram assistant agent', () => {
       const nextPrompt = JSON.stringify(model.doStreamCalls[expectedRequests + 1].prompt)
       assert.ok(nextPrompt.includes(scenario.user) && nextPrompt.includes('lookup-1') && nextPrompt.includes('https://example.com/precio'))
       assert.ok(sent[0].includes('https://example.com/precio'))
+    })
+  }
+
+  it('rejects nonowner, group and missing sender updates before model or repository access', async () => {
+    process.env.TELEGRAM_OWNER_ID = '555'
+    let repositoryCalls = 0
+    const expenses: ExpenseRuntime = { getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test' }),
+      getRepository: () => { repositoryCalls++; throw Error('no access allowed') },
+      convert: async () => { throw Error('no FX allowed') }, now: () => new Date() }
+    const model = modelWithText('must not run')
+    const agent = createTelegramAssistant(`owner-gate-${++n}`, () => model, { getKey: () => undefined, createClient: async () => { throw Error() } }, () => new Date(), expenses)
+    const harness = mockChatAgent(agent, { chatId: '555' })
+    try {
+      for (const message of [
+        { from: { id: 99 }, chat: { id: 555, type: 'private' } },
+        { from: { id: 555 }, chat: { id: 555, type: 'group' } },
+        { chat: { id: 555, type: 'private' } },
+        { from: { id: 555 }, chat: { id: 99, type: 'private' } },
+      ]) await harness.deliverChannelEvent({ event: { update_id: ++n, message: { message_id: n, text: 'Gasté 3500', ...message } }, connectorId: 'telegram' })
+    } finally { await harness.close() }
+    assert.equal(model.doStreamCalls.length, 0); assert.equal(repositoryCalls, 0)
+  })
+
+  it('rejects model-supplied owner and source identity at the schema boundary', async () => {
+    process.env.TELEGRAM_OWNER_ID = '555'; process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+    globalThis.fetch = (async () => new Response('{}')) as typeof fetch
+    let repositoryCalls = 0; let step = 0
+    const expenses: ExpenseRuntime = { getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test' }),
+      getRepository: () => { repositoryCalls++; throw Error('no DB access expected') }, convert: async () => null, now: () => new Date() }
+    const model = new MockLanguageModelV4({ doStream: async options => {
+      if (step++ > 0) return modelWithText('No confirmado').doStream(options)
+      return { stream: simulateReadableStream({ chunks: [
+        { type: 'tool-call', toolCallId: 'forged-input', toolName: 'registrarGasto', input: JSON.stringify({ description: 'café', amount: '1', ownerId: '999', sourceKey: 'model-origin' }) },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage: { inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 1, text: 0, reasoning: undefined } } },
+      ] }) }
+    } })
+    const agent = createTelegramAssistant(`forged-input-${++n}`, () => model, { getKey: () => undefined, createClient: async () => { throw Error() } }, expenses.now, expenses)
+    const harness = mockChatAgent(agent, { chatId: '555' })
+    try { await harness.sendChannelEvent({ event: { update_id: ++n, message: { message_id: n, from: { id: 555 }, chat: { id: 555, type: 'private' }, text: 'Gasté 1' } }, connectorId: 'telegram' }) }
+    finally { await harness.close() }
+    assert.equal(repositoryCalls, 0); assert.equal(model.doStreamCalls.length, 2)
+    assert.ok(harness.allChunks.some(chunk => chunk.type === 'tool-input-error'))
+  })
+
+  it('registers, consults and corrects through managed tools and sends stored decimal amounts to Telegram', async t => {
+    process.env.TELEGRAM_OWNER_ID = '555'; process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+    const db = new PGlite(); t.after(() => db.close())
+    await db.exec(await readFile(new URL('../../drizzle/0000_personal_expenses.sql', import.meta.url), 'utf8'))
+    const repository = createExpenseRepository(drizzle(db))
+    const sent: string[] = []
+    globalThis.fetch = (async (_url: unknown, init?: RequestInit) => { sent.push(JSON.parse(String(init?.body)).text); return new Response('{}') }) as typeof fetch
+    const expenses: ExpenseRuntime = { getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test-only' }), getRepository: () => repository,
+      convert: async () => { throw Error('ARS never calls FX') }, now: () => new Date('2024-03-02T01:00:00Z') }
+    let step = 0
+    const model = new MockLanguageModelV4({ doStream: async options => {
+      const current = step++
+      if (current % 2 === 1) {
+        const toolMessage = options.prompt.filter(m => m.role === 'tool').at(-1)!
+        const output = (toolMessage.content[0] as any).output.value
+        const record = output.record ?? output.records[0]
+        return modelWithText(`${output.status}: ARS ${record.arsAmount}`).doStream(options)
+      }
+      const names = ['registrarGasto', 'consultarGastos', 'corregirGasto']
+      const previous = options.prompt.filter(m => m.role === 'tool').at(-1)
+      const listed = previous ? (previous.content[0] as any).output.value.records?.[0] : undefined
+      const input = current === 0 ? { description: 'café', amount: '3500' } : current === 2 ? {} : { id: listed.id, expectedVersion: listed.version, patch: { amount: '4000' } }
+      return { stream: simulateReadableStream({ chunks: [
+        { type: 'tool-call', toolCallId: `expense-${current}`, toolName: names[current / 2], input: JSON.stringify(input) },
+        { type: 'finish', finishReason: { unified: 'tool-calls', raw: 'tool-calls' }, usage: { inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 1, text: 0, reasoning: undefined } } },
+      ] }) }
+    } })
+    const agent = createTelegramAssistant(`expenses-e2e-${++n}`, () => model, { getKey: () => undefined, createClient: async () => { throw Error() } }, expenses.now, expenses)
+    const chatId = '555'
+    const harness = mockChatAgent(agent, { chatId, clientData: { ownerId: 'forged', runId: 'forged' }, taskContext: { ctx: { run: { id: 'run_ledger_integration' } } } })
+    try {
+      for (const text of ['Gasté 3500 en café', 'Mostrá mis gastos', 'Corregí ese gasto a 4000']) {
+        await harness.sendChannelEvent({ event: { update_id: ++n, message: { message_id: n, from: { id: 555 }, chat: { id: 555, type: 'private' }, text } }, connectorId: 'telegram' })
+        const { __waitForChannelEgressForTests } = await import('@trigger.dev/sdk/ai')
+        await __waitForChannelEgressForTests(chatId)
+      }
+    } finally { await harness.close() }
+    assert.deepEqual(sent, ['saved: ARS 3500.00', 'ok: ARS 3500.00', 'corrected: ARS 4000.00'])
+    const stored = await repository.list({ ownerId: '555' })
+    assert.equal(stored.records.length, 1); assert.equal(stored.records[0].amount, '4000.00'); assert.equal(stored.records[0].version, 2)
+    assert.match(stored.records[0].sourceKey, /^run_ledger_integration:\d+:register$/)
+    for (const call of model.doStreamCalls) {
+      assert.ok(call.tools?.some(tool => tool.type === 'function' && tool.name === 'registrarGasto'))
+      const prompt = JSON.stringify(call.prompt)
+      assert.ok(!prompt.includes('run_ledger_integration') && !prompt.includes('forged'))
+    }
+  })
+
+  for (const env of [{}, { TELEGRAM_OWNER_ID: '555' }, { TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test' }]) {
+    it(`does not offer expenses without complete configuration and matching channel (${JSON.stringify(env)})`, async () => {
+      process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
+      globalThis.fetch = (async () => new Response('{}')) as typeof fetch
+      const model = modelWithText('chat normal')
+      const expenses: ExpenseRuntime = { getEnv: () => env, getRepository: () => { throw Error('must not access DB') }, convert: async () => null, now: () => new Date() }
+      const agent = createTelegramAssistant(`expenses-unconfigured-${++n}`, () => model, { getKey: () => 'fake-web-key', createClient: async () => { throw Error('not used') } }, expenses.now, expenses)
+      const harness = mockChatAgent(agent, { chatId: 'other-channel' })
+      try { await harness.sendChannelEvent({ event: update(++n, 560, 'hola'), connectorId: 'telegram' }) }
+      finally { await harness.close() }
+      assert.equal(model.doStreamCalls.length, 1)
+      assert.ok(model.doStreamCalls[0].tools?.some(tool => tool.type === 'function' && tool.name === 'webSearch'))
+      assert.ok(!model.doStreamCalls[0].tools?.some(tool => tool.type === 'function' && tool.name === 'registrarGasto'))
+      assert.ok(JSON.stringify(model.doStreamCalls[0].prompt).includes('Gastos no disponibles'))
     })
   }
 
