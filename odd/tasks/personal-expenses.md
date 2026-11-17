@@ -13,8 +13,8 @@ Tracking bootstrap only: this document authorizes no source implementation, publ
 
 - T1 — DONE (`54fec7b`): expense domain, Drizzle/Postgres persistence, and SQL migration; parent reports 8 isolated PGlite tests exercising the exact migration SQL; schema not applied live (S1, S2).
 - T2 — DONE (`0c3f394`): fixed official-rate adapters, exact decimal mean, same-date/latest-prior selection and pending conversion; parent reports 17 mocked FX tests (S2, S3).
-- T3 — NEXT: implement the trusted Telegram owner gate and text tools, prove managed `runtimeContext` propagation offline before enabling writes, and update README/instructions with tests; assign one writer a narrow code/tests/docs surface before starting (S1–S3; preserve S4 exclusions).
-- T4 — PENDING: independently verify the implementation and complete the parent-owned native review lifecycle; parent escalation item 1 requires an independent verifier, not approval; confirm deferred features remain excluded and no unauthorized production changes occurred (S1–S4).
+- T3 — SOURCE IMPLEMENTED (`e210e0b5e7ba2e7da929eaf1571950f97c277b91`, domain owner get `3231b42`): owner-gated text tools and docs; managed AI SDK 7 `toolsContext` with per-tool `contextSchema` forwarding works, with the negative `runtimeContext`-only probe preserved; writer and parent report 90/90 local tests, both TypeScript checks, and Trigger `--dry-run` passing; independent proof and authorized activation remain outstanding (S1–S3; preserve S4 exclusions).
+- T4 — BLOCKED, NOT DONE: independent verification of fixed candidate `e210e0b5e7ba2e7da929eaf1571950f97c277b91` stopped during mandatory preparation, before any independent tests; safe preparation needs explicit human approval before one bounded verification attempt; full-candidate native review has not started, and overall feature completion awaits T4 proof and authorized activation (S1–S4).
 
 ## Log
 
@@ -62,10 +62,10 @@ These observations were supplied by the parent and were not independently fetche
 - Actual parent-observed official seller rates for November 16, 2026: DolarAPI 1575, Bluelytics 1572, ArgentinaDatos 1570. These are illustrative historical observations, not fixed production rates; Bluelytics here means its `Oficial` source, not `Blue`.
 - Only compare observations with the same quote date; do not combine the Bluelytics November 17 observation with November 16 observations. Select the latest prior qualifying date when needed, never a date newer than the expense. Historical availability outside the observed responses is not established by this evidence.
 
-### L4 — Open T3 security and idempotency proof
+### L4 — T3 security and idempotency proof: corrected forwarding contract
 
-- Trigger's `tools` resolver receives `{chatId, turn}`; the run has trusted `ctx.run.id`. AI SDK 7 supports `runtimeContext` passed through `ToolExecutionOptions.context`.
-- Before ledger write tools are enabled, prove with offline `mockChatAgent` coverage that managed `run.streamText` forwards server context. Do not assume that interface availability proves managed forwarding.
+- Trigger's `tools` resolver receives `{chatId, turn}`; the run has trusted `ctx.run.id`. The initial `runtimeContext` forwarding hypothesis was superseded by local probe evidence: installed AI SDK 7 separates `runtimeContext` from server-only `toolsContext` keyed by tool name with per-tool `contextSchema`.
+- Parent reports managed `run.streamText` forwarding works through `toolsContext`; preserve the negative `runtimeContext`-only probe. This is local evidence, not completed independent verification or authorization to activate ledger writes.
 - Use backend run ID plus turn as the idempotency identity, stable across task retries; initially one expense per turn. Test replay of identical trusted context and retain existing webhook `update_id` deduplication.
 - Do not claim exactly-once behavior across SDK behaviors that have not been proven. Resolve missing context safely before any ledger write.
 
@@ -75,4 +75,31 @@ These observations were supplied by the parent and were not independently fetche
 - Dependency installs for `pg` and `drizzle-orm`, plus PGlite and development tooling, generated lockfile changes. This update records that implementation evidence only; it performs no dependency installs or lockfile edits.
 - The schema has not been applied to a live database. No production migration or data mutation is authorized by this update.
 - Parent-reported native assessment against base `ead5920`, `committedOnly`: medium / not due. Parent escalation item 1 nevertheless requires an independent verifier; this is a verification requirement, not an approval request or completed review disposition. T4 remains pending and parent-owned.
-- T3 is next: owner-gated tools, managed server `runtimeContext` proof, and documentation. Future photo, voice, CRM, supermarket-list, and calendar stages remain deferred, not obsolete; all user evidence above remains applicable.
+- At this earlier handoff T3 was next, including the then-unproven `runtimeContext` hypothesis; L4 and L6 supersede that implementation status and forwarding hypothesis. Future photo, voice, CRM, supermarket-list, and calendar stages remain deferred, not obsolete; all user evidence above remains applicable.
+
+### L6 — Parent-reported T3 implementation and public FX probe
+
+- Source implementation: `e210e0b5e7ba2e7da929eaf1571950f97c277b91`; domain owner get: `3231b42`. Writer and parent each report 90/90 local tests passing, both TypeScript checks passing, and Trigger `--dry-run` passing. Exact test, typecheck, and dry-run command lines were not supplied in this update; this documentation writer did not rerun them. T1/T2 are locally verified; T3 is implemented with local checks, not independently verified.
+- The public FX probe actually returned `expenseDate: 2026-11-17`, `quoteDate: 2026-11-17`, Bluelytics official seller 1574 and ArgentinaDatos 1575, indicative mean `1574.500000`, and 100 USD converted to 157450 ARS. Record this as observed probe/test evidence, never a hardcoded production rate. It supplements, rather than replaces, L3's November 16 observations; same-date and latest-prior selection rules remain in force.
+- No live database schema was applied and no live data writes occurred. Overall feature status remains INCOMPLETE until T4 proof and authorized activation. No publishing is authorized.
+
+### L7 — Independent verification preparation failure
+
+- Independent verifier binding is fixed to candidate `e210e0b5e7ba2e7da929eaf1571950f97c277b91`. The mandatory preparer rejects 16 symlinks and enforces a 256 MiB payload cap. Reduced functional dependencies excluding maps total 235406164 bytes and would fit the cap; that size estimate is not successful preparation evidence.
+- The preparation writer's `.trigger/verifier-expenses-deps` stage stopped BEFORE copying after the environment-filename policy block. Actual preparation attempt: exit 1, `Environment file prohibited`. No automatic rerun is permitted.
+- Zero independent tests ran. No isolated scratch directory or payload was created. Only the existing untracked, ignored `prepare.py` helper remains, as reported by the parent; this tracking writer does not alter it.
+- This is a preparation failure, not evidence that verifier capability is unavailable or an upgrade is needed. T4 is blocked, not done. Full-candidate native review has not started; no native budgets have been opened. Earlier native assessment in L5 is not full-candidate review or approval.
+
+### L8 — Static observations pending technical work/review
+
+These are parent-supplied static observations, not reproduced blockers, exploit demonstrations, or approval dispositions.
+
+1. Evidence validation checks arithmetic but does not establish portal-allowlist authenticity.
+2. The capability authenticates the owner, not explicit current-user intent. Web prompt injection leading to expense writes remains unproven; owner authentication alone does not prove intent authorization.
+3. PostgreSQL has a connection-acquisition timeout but no statement/query timeout.
+
+### L9 — Bounded continuation proposal; not authorization
+
+- Parent may offer the same implementation writers narrowly scoped continuation for the three static findings in L8, with exact edit surfaces, correction limits, and focused checks explicitly authorized before work. Keep these findings pending until technical disposition and evidence exist; do not weaken checks.
+- Human approval is required for a repaired safe preparation plan that excludes environment files, handles the rejected symlinks without weakening mandatory checks, and stays within the 256 MiB cap. Only after safe preparation is repaired and approved may one bounded independent-verifier attempt run; no automatic retries or silent candidate rebinding.
+- The parent retains candidate binding, review disposition, and activation decisions. Do not reset native budgets (none have been opened), treat local checks as independent proof, claim approval, publish, or apply a live schema. Future stages remain deferred, not obsolete.
