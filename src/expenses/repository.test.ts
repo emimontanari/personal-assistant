@@ -32,6 +32,21 @@ test('ARS register, normalized records, totals and replay collision', async t =>
   assert.deepEqual(result, { records: [saved], totalArs: '10.50', pendingCount: 0 });
 });
 
+test('get validates identity, scopes owner and preserves records and revision state', async t => {
+  const repo = await fixture(t);
+  const saved = await repo.register({...input,amount:'10.5'});
+  const before = await repo.list({ownerId:'123'});
+  const audit = await repo.revisions({ownerId:'123',id:saved.id});
+  assert.deepEqual(await repo.get({ownerId:'123',id:saved.id}),saved);
+  assert.equal(saved.amount,'10.50'); assert.equal(saved.arsAmount,'10.50');
+  assert.equal(await repo.get({ownerId:'456',id:saved.id}),null);
+  assert.equal(await repo.get({ownerId:'123',id:'00000000-0000-4000-8000-000000000000'}),null);
+  await assert.rejects(repo.get({ownerId:'123',id:'invalid'}),error('validation'));
+  await assert.rejects(repo.get({ownerId:'',id:saved.id}),error('validation'));
+  assert.deepEqual(await repo.list({ownerId:'123'}),before);
+  assert.deepEqual(await repo.revisions({ownerId:'123',id:saved.id}),audit);
+});
+
 test('USD pending and exact two/three portal evidence persisted and totaled', async t => {
   const repo = await fixture(t);
   const pending = await repo.register({...input, currency: 'USD'});

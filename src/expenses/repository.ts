@@ -53,6 +53,12 @@ export function createExpenseRepository<Q extends PgQueryResultHKT, S extends Re
       if (!existing || existing.sourcePayload !== sourcePayload) throw new ExpenseError('conflict');
       return record(existing);
     },
+    async get(input: {ownerId:string;id:string}): Promise<ExpenseRecord | null> {
+      valid(input && typeof input === 'object');
+      const where = identity(input);
+      const [row] = await db.select().from(expenses).where(where).limit(1);
+      return row ? record(row) : null;
+    },
     async list(input: ListInput) {
       valid(input && typeof input === 'object'); text(input.ownerId,100);
       const limit = input.limit ?? 100; valid(Number.isInteger(limit) && limit >= 1 && limit <= 100);

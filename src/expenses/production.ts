@@ -22,7 +22,7 @@ export function getExpenseRepository(env: {DATABASE_URL?: string} = process.env)
     const safe = <A, R>(fn: (arg:A)=>Promise<R>) => async (arg:A): Promise<R> => {
       try { return await fn(arg); } catch (e) { if (e instanceof ExpenseError) throw e; throw new ExpenseError('unavailable'); }
     };
-    repository = {register:safe(raw.register),list:safe(raw.list),correct:safe(raw.correct),revisions:safe(raw.revisions)};
+    repository = {register:safe(raw.register),get:safe(raw.get),list:safe(raw.list),correct:safe(raw.correct),revisions:safe(raw.revisions)};
     return repository;
   } catch { throw new ExpenseError('unconfigured'); }
 }
