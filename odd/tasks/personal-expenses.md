@@ -1,6 +1,7 @@
 # Personal expenses
 Text-first expense tools for a single-user personal assistant, with persistent records and evidence-backed USD conversion.
-Tracking bootstrap only: this document authorizes no source implementation, publishing, or live database changes.
+Authorized implementation, independent offline verification, and final bundle dry-run are complete; production activation remains separately unauthorized.
+This document began as a tracking-only bootstrap; its log preserves subsequent scoped authorizations and evidence without authorizing live database changes or publishing.
 
 ## Specs
 
@@ -13,11 +14,11 @@ Tracking bootstrap only: this document authorizes no source implementation, publ
 
 - T1 — DONE (`54fec7b`): expense domain, Drizzle/Postgres persistence, and SQL migration; parent reports 8 isolated PGlite tests exercising the exact migration SQL; schema not applied live (S1, S2).
 - T2 — DONE (`0c3f394`): fixed official-rate adapters, exact decimal mean, same-date/latest-prior selection and pending conversion; parent reports 17 mocked FX tests (S2, S3).
-- T3 — SOURCE IMPLEMENTED (`e210e0b5e7ba2e7da929eaf1571950f97c277b91`, domain owner get `3231b42`): owner-gated text tools and docs; managed AI SDK 7 `toolsContext` with per-tool `contextSchema` forwarding works, with the negative `runtimeContext`-only probe preserved; writer and parent report 90/90 local tests, both TypeScript checks, and Trigger `--dry-run` passing; later independent offline proof is recorded in L14; the earlier dry-run is historical, not final-candidate bundle proof, and activation remains unauthorized (S1–S3; preserve S4 exclusions).
+- T3 — DONE, IMPLEMENTATION VERIFIED: initial source `e210e0b5e7ba2e7da929eaf1571950f97c277b91`, domain owner get `3231b42`, corrected candidate `ea21af9e85f71a38f841add98382f1f835618c6d`; owner-gated text tools/docs and managed per-tool `toolsContext` forwarding verified, negative `runtimeContext`-only probe preserved; L14 independent offline proof and L22 final dry-run complete, without production activation (S1–S3; preserve S4 exclusions).
 - T5 — DONE, ROUND 1: domain `a17b841` (142 authored lines), intent/docs `ea21af9e85f71a38f841add98382f1f835618c6d` (264 authored lines); three bounded corrections locally checked and independently verified offline in L14; round 2 unused; timeout proof is configuration/startup only, not live enforcement (S1–S3).
 - T6 — DONE, PREREQUISITES: safe regular-file dependency payload prepared at `.trigger/verifier-expenses-deps/node_modules`, 235407044 bytes, 15315 regular files, zero symlinks and environment/secret filenames; mandatory preparer/helper checks unchanged (S1–S3).
-- T4 — INDEPENDENT OFFLINE VERIFICATION PASSED on `ea21af9e85f71a38f841add98382f1f835618c6d` against `ead5920`: 141/141 tests once, three additional independent probes, both TypeScript checks, baseline-identical Hono GET-only behavior, whitespace and drift checks pass; S1–S3 met offline, S4 deferred; old zero-test failure remains historical, native review separately assessed but not started, and final bundle proof remains pending in T7 (S1–S4).
-- T7 — BLOCKED, AUTH/REMOTE-ENVIRONMENT PERMISSION: exact cached `trigger.dev@4.8.5` found and help/version checks pass; dry-run NOT invoked because CLI inspection shows network update checking, login without a token, and remote environment-variable fetching before completion; L17 resolved artifact permission only, not cloud access; separate human permission for Trigger login/remote queries OR a future independently scoped local-build strategy is required; no final bundle proof, activation, migration, or publishing (S1–S3).
+- T4 — DONE, INDEPENDENT OFFLINE VERIFICATION: `ea21af9e85f71a38f841add98382f1f835618c6d` against `ead5920`, 141/141 tests once, three independent probes, both TypeScript checks, baseline-identical Hono GET-only behavior, whitespace and drift checks pass; S1–S3 met offline, S4 deferred; prior zero-test failure historical, native review separately assessed but not started, no extra independent attempt (S1–S4).
+- T7 — DONE, FINAL DRY-RUN: official cached CLI `4.8.5` authenticated and built frozen candidate `ea21af9e85f71a38f841add98382f1f835618c6d` successfully, exit 0, no timeout, `Dry run complete`; source/payload hashes unchanged, zero task executions, no deployment or live database actions; L22 closes authorized implementation and offline verification, not production activation (S1–S3).
 
 ## Log
 
@@ -150,7 +151,7 @@ Latest user reply, verbatim:
 ### L15 — Native assessment; no invented review lifecycle
 
 - Parent-reported native ASSESS: base `85995b7`, `committedOnly`, escalate item 2, risk high, native medium, `reviewDue: false`, reason `under_budget`, `independentVerifier: true` (now satisfied by L14). No native START, consent, or closure is claimed; native review has not started. No budgets were reset and no old commits were rewritten.
-- Remaining risk classification: item 1 ledger, item 2 guard, item 5 dependencies. Independent/test proof did not fail; the original tooling blocker in L16 was resolved by L17/L18, but final bundle proof now requires the separate auth/remote-environment decision in L18. Overall feature status is not fully complete.
+- Remaining risk classification: item 1 ledger, item 2 guard, item 5 dependencies. Independent/test proof did not fail; the original tooling blocker in L16 was resolved by L17/L18, the separate auth/remote-environment boundary in L18 was subsequently authorized for dry-run only in L19, and final bundle proof remains pending. Overall feature status is not fully complete.
 
 ### L16 — Historical T7 tooling blocker and decision; authorization recorded in L17
 
@@ -179,3 +180,53 @@ Latest human reply, verbatim:
 - Evidence paths reported by the parent: `.trigger/expense-build-cli/capability-report.json`, `.trigger/expense-build-cli/deploy-help.stdout.log`, and `.trigger/expense-build-cli/check-cli.py`. No network calls, installs, environment-file reads, source changes, database access, or deployment actions occurred. No bundle was produced, and no isolated archive or dependency copy was made. Existing payload and `dist/` are unchanged. Source HEAD remains `ea21af9e85f71a38f841add98382f1f835618c6d`; only tracking differs.
 - NeedsDecision — the parent must separately request permission for Trigger login and the required remote queries, OR propose an independently scoped future local-build strategy; neither is authorized now. The parent may also leave T7 blocked. This update grants no cloud access and performs no tooling work.
 - Existing independent 141/141 tests plus three probes, both TypeScript checks, baseline Hono comparison, and parent audit remain valid with their original attribution. No additional verifier, test, or native attempt ran or is authorized here; prior budgets and history remain unchanged. S1–S4 and all user quotations are preserved. No database activation, migration, production publishing, or secret changes are authorized; feature completion and final bundle proof remain outstanding.
+
+### L19 — Explicit dry-run-only Trigger access authorization
+
+Full parent question, verbatim:
+> Encontré la CLI **4.8.5**, pero me corrijo: su dry-run **no es completamente local**. Antes de compilar exige autenticación y consulta variables remotas de Trigger. Frené antes de ejecutarlo: no leí secretos, no toqué la base ni desplegué. Las **141 pruebas + 3 controles independientes** siguen aprobadas. **Necesito tu decisión:** ¿autorizás ese acceso a Trigger únicamente para el dry-run, sin desplegar?
+
+Latest human reply, verbatim:
+> si
+
+- This reply authorizes Trigger authentication and cloud environment consultation solely for the dry-run, resolving L18's permission boundary. T7 is in progress. The existing exact cached `trigger.dev@4.8.5` grant and isolation constraints remain unchanged; no new version or installation authority is added.
+- Actual login may require a human interactive step. Authentication is not assumed complete, and no final bundle or dry-run success is claimed. No local `.env` reads, secret printing, live database access, migrations, deployment, push, production activation, or publishing are authorized.
+- Parent confirms all child tasks completed before continuation and reports HEAD `bee84ce`, source drift clean against `ea21af9e85f71a38f841add98382f1f835618c6d`, with only pre-existing untracked `dist/` before this tracking update. Source and payload remain unchanged. This writer edits only this feature document before tooling writes and performs no authentication or remote queries.
+- Independent-attempt counts, correction and native budgets, historical evidence, S1–S4, and existing independent proof are unchanged. No additional independent tests or native attempt are authorized; future stages remain deferred, and overall completion awaits final bundle proof and separately authorized activation.
+
+### L20 — Official isolated login started; human browser approval pending
+
+- Parent reports existing preparation worker `mwm0aybo-14-rw6w` ran `python3 .trigger/expense-build-cli/auth-step.py help`: exit 0; `python3 .trigger/expense-build-cli/auth-step.py start`: exit 0. The latter started the official cached CLI `4.8.5` login using `login --no-browser --no-wait --skip-telemetry`, with isolated HOME/TMPDIR/XDG. This documentation writer did not execute these commands.
+- Non-sensitive status artifact: `.trigger/expense-build-cli/login-sanitized.json`. Authentication is awaiting HUMAN browser approval, with approximately 10-minute expiry, not missing permission. The official approval page supplies the intended CLI verification code; the parent will relay the public official URL to the current human. No authorization URL, code, token, or credential is copied into this document or memory.
+- No job is pending and no archive copy, dependency copy, bundle, or dry-run has been initiated. L19 remains the authority for dry-run-only access; no further permission approval for that dry-run is needed after authentication. Browser approval is still required and successful authentication is not claimed.
+- No credentials or environment contents were logged, copied, or read. Root `.env`, `dist/`, payload, and source remain unchanged. Parent reports HEAD `bee84ce` plus tracking-document changes only, with source still at `ea21af9e85f71a38f841add98382f1f835618c6d`.
+- Existing independent 141/141 tests plus three probes remain unchanged; no new tests or native verification ran. S1–S4, all user quotations, prior budgets, and historical evidence are preserved. No database access, activation, migration, deployment, push, or publishing is authorized; final bundle proof remains outstanding.
+
+### L21 — Accepted human-terminal login route; interactive flow untested
+
+Parent recommendation, verbatim:
+> Mi recomendación: completá el login desde tu terminal, sin compartir códigos acá. Después sigo con el dry-run, sin desplegar.
+
+Latest human reply, verbatim:
+> dale
+
+- The human accepts terminal login with NO codes via chat. Prior intermediate links expired; the expired attempt did not authenticate, and dry-run never started. A missing empty-environment input in the technical helper was fixed and later expiry confirmed. No CLI or provider guards were patched. No actual verification code or authorization URL is included here.
+- Parent reports worker `mwmam7cv-1a-qwto` created ignored `.trigger/expense-build-cli/terminal-login.py`. Human command from the repository root: `python3 .trigger/expense-build-cli/terminal-login.py`. It requires a TTY, offers offline `--help`, uses existing isolated HOME/auth status and only cached CLI `4.8.5`, and creates a fresh request only ON HUMAN INVOCATION or reuses a valid pending request.
+- Verification is entered locally through hidden `getpass` input and forwarded to finish via stdin, not OS argv, files, history, or logs. Expected non-sensitive success message: `Authenticated. Ready for dry-run; nothing deployed.` This is expected output, not observed authentication success.
+- Structural checks only, parent-reported: `py_compile` of all three helpers exited 0 (full command not supplied); `python3 .trigger/expense-build-cli/terminal-login.py --help` exited 0, including the parent's spot check; non-TTY `python3 .trigger/expense-build-cli/terminal-login.py </dev/null` exited the expected 2 before authentication. This documentation writer did not run those checks. The interactive flow is UNTESTED; no actual authentication, network checks, tests, or bundle execution were triggered in this step.
+- T7 remains blocked awaiting the human terminal run and confirmation. L19's remote-read and dry-run authorization remains valid after login; no new permission is needed. No new independent verification or native attempt occurred, and no budgets reset. Historical independent 141/141 plus three probes and parent audit retain their original attribution.
+- Parent reports HEAD `bee84ce`, source candidate `ea21af9e85f71a38f841add98382f1f835618c6d` unchanged, only the feature document modified and pre-existing `dist/` untracked. Source, payload, and `dist/` are unchanged. S1–S4, user quotations, and prior evidence are preserved; no local `.env` reads, database access, activation, migration, deployment, push, or publishing are authorized. This update changes only tracking and claims no final bundle proof.
+
+### L22 — Final dry-run success and authorized feature closure
+
+Latest human confirmation of terminal helper execution, verbatim:
+> listo
+
+- Parent reports worker `mwmgabmg-1c-vq5n` obtained official status exit 0, AUTHENTICATED, then successfully ran the actual frozen-candidate dry-run on `ea21af9e85f71a38f841add98382f1f835618c6d`. This supersedes earlier blocked/authentication-pending statuses as HISTORY, without removing them or their evidence. No authorization codes, URLs, tokens, or secret values are recorded here.
+- Official cached CLI `4.8.5` ran directly via Node from the isolated archive working directory with arguments `deploy . --dry-run --env prod --config <scratchproject>/trigger.config.ts --env-file <stage>/cwd/empty-env-input --skip-update-check --skip-sync-env-vars --skip-telemetry`. Placeholders describe isolated paths, not a separately executed command. The parent read `.trigger/expense-build-cli/dry-run-result.json`: `actual_child_exit_code: 0`, `timed_out: false`, `dry_run_complete: true`, stages `Successfully built code` and `Dry run complete`, `error_categories: []`. No correction or timeout occurred during this build. This documentation writer did not execute the build or inspect its artifacts.
+- Source/payload hashes are unchanged: 46 source-candidate files hashed; dependency payload retains 15315 files, 235407044 bytes, zero links. Bundle path: `.trigger/expense-build-scratch/project/.trigger/tmp/build-FSltIv`; content hash `9aef01f1f616518769d2151308b3d2e2`; runtime Node 24; two source bundle entries, with source IDs `hello-world` and `telegram-assistant`. Independently indexed task count was NOT verified; these entries must not be described as two indexed tasks.
+- Sanitized evidence: `.trigger/expense-build-cli/dry-run-result.json` and `.trigger/expense-build-cli/dry-run.sanitized.log`. HOME/TMPDIR/XDG remained cleared/isolated; no human `.env` files were read. There was no actual deployment, upload, task execution, database access, migration, or remote environment change; `executed_task_count: 0`. One optional post-build filename audit was policy-blocked and not retried; this is a limitation, not missing mandatory build proof. No additional inspection is implied.
+- T7 is DONE; T4 is DONE offline; T3 implementation is verified. Authorized implementation plus offline verification is COMPLETE, with final bundle proof. Existing independent 141/141 plus three probes, both TypeScript checks, Hono baseline comparison, and parent audit with zero vulnerabilities remain current with their original attribution. No new tests, verifier run, native attempt, or budget reset occurred. Round 1 corrections are done and round 2 unused; the single authorized new independent attempt remains the one recorded in L14.
+- Risk classification remains item 1 ledger, item 2 owner/intent guard, and item 5 dependencies. Proof is offline plus build, not production operation, live database correctness, or live PostgreSQL timeout enforcement. S1–S4 and exact user quotations remain unchanged; future stages remain deferred.
+- Production activation, migration, owner/environment configuration, deployment, push, and merge are separately UNAUTHORIZED next steps, not newly tracked pending tasks without an explicit human request. This closure does not claim production readiness in operation or alter native assessment history. Bounded units remain `a17b841` (142 authored lines) and `ea21af9` (264 authored lines); no old commits are rewritten. The final tracking unit closes the authorized feature scope; parent owns any document-only commit after checks.
+- Parent reports last HEAD `bee84ce`, only this feature document modified and pre-existing `dist/` untracked. Source, payload, and `dist/` are unchanged. This writer changes only the feature document and performs no authentication, tooling execution, secret access, or commit.
