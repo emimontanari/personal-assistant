@@ -6,7 +6,7 @@ import { getExpenseRepository } from '../expenses/production.js'
 import { convertUsdToArs } from '../fx/index.js'
 import type { ExpensePermission } from './expense-intent.js'
 
-export interface ExpenseEnv { TELEGRAM_OWNER_ID?: string; DATABASE_URL?: string }
+export interface ExpenseEnv { TELEGRAM_OWNER_ID?: string; DATABASE_URL?: string; EXPENSES_ENABLED?: string }
 export interface ExpenseRuntime {
   getEnv: () => ExpenseEnv
   getRepository: () => ExpenseRepository
@@ -14,14 +14,16 @@ export interface ExpenseRuntime {
   now: () => Date
 }
 export const expenseRuntime: ExpenseRuntime = {
-  getEnv: () => ({ TELEGRAM_OWNER_ID: process.env.TELEGRAM_OWNER_ID, DATABASE_URL: process.env.DATABASE_URL }),
+  getEnv: () => ({ TELEGRAM_OWNER_ID: process.env.TELEGRAM_OWNER_ID, DATABASE_URL: process.env.DATABASE_URL, EXPENSES_ENABLED: process.env.EXPENSES_ENABLED }),
   getRepository: () => getExpenseRepository(), convert: convertUsdToArs, now: () => new Date(),
 }
 export function configuredOwner(value: string | undefined): string | undefined {
   return value && /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value)) ? value : undefined
 }
 export function expensesAvailable(env: ExpenseEnv, chatId: string): boolean {
-  return Boolean(env.DATABASE_URL && configuredOwner(env.TELEGRAM_OWNER_ID) === chatId)
+  // Unset preserves legacy configuration; every provided value except exact 'true' denies.
+  return (env.EXPENSES_ENABLED === undefined || env.EXPENSES_ENABLED === 'true')
+    && Boolean(env.DATABASE_URL && configuredOwner(env.TELEGRAM_OWNER_ID) === chatId)
 }
 export function argentinaToday(now: Date): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
@@ -64,7 +66,7 @@ export function createExpenseTools(binding: { chatId: string; turn: number; capa
   function authorize(context: ExpenseContext | undefined, signal?: AbortSignal, write?: 'register' | 'correct') {
     const env = runtime.getEnv()
     const owner = configuredOwner(env.TELEGRAM_OWNER_ID)
-    if (!owner || !env.DATABASE_URL) throw new ExpenseError('unconfigured')
+    if (!owner || !expensesAvailable(env, owner)) throw new ExpenseError('unconfigured')
     if (!context || !Object.isFrozen(context) || context.capability !== binding.capability
       || context.ownerId !== owner || context.chatId !== owner || binding.chatId !== owner
       || typeof context.runId !== 'string' || !context.runId || context.runId.length > 180

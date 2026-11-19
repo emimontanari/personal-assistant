@@ -18,6 +18,8 @@ Telegram → endpoint webhook `telegram` → chat.agent `telegram-assistant` (un
 
 Tres tools en Trigger.dev, no en Hono: `registrarGasto`, `consultarGastos` y `corregirGasto`. Requieren **`TELEGRAM_OWNER_ID` y `DATABASE_URL`** en el entorno de Trigger.dev. Configurá el propietario **antes de usar datos financieros**: es el ID numérico positivo de Telegram `message.from.id`, no el username. Con propietario configurado solo se aceptan mensajes de ese remitente en su chat privado con el mismo ID; grupos, otros usuarios y mensajes sin remitente se descartan antes del modelo. Un ID configurado inválido también bloquea la entrada. Sin propietario se conserva el chat general/web, pero no se ofrecen tools de gastos ni se permiten escrituras; sin DB tampoco se habilitan gastos.
 
+**Interruptor del servidor `EXPENSES_ENABLED`:** omitido conserva la disponibilidad anterior (DB + propietario válido); solo el string exacto `true` permite gastos con todas las barreras existentes. Cualquier otro valor presente (`false`, `0`, vacío, `TRUE`, ` true ` o un typo) desactiva las tres tools, incluidas consultas. Se comprueba al ofrecerlas y dentro de cada ejecutor, incluso si el contexto autorizado se creó antes de desactivarlo, antes de acceder a DB/FX. No acepta overrides del modelo ni de `clientData`. No cambia el filtro de propietario, el chat general, Firecrawl ni la memoria.
+
 - “Gasté 3500 en café” ⇒ ARS 3500.00 por defecto. Solo USD explícito: no se infiere la moneda por el nombre de un producto.
 - “Gasté USD100 en GTA6” ⇒ conserva USD 100.00 y muestra ARS **indicativo** si hay evidencia, junto con la fecha de cotización y las fuentes guardadas; no hay tasa fija ni liquidación de tarjeta garantizada.
 - Importe decimal positivo de hasta dos decimales, descripción de hasta 500 caracteres, categoría opcional de hasta 100. Si faltan datos o son ambiguos el agente pregunta; datos claros se guardan mediante la tool, un gasto por turno. Fecha omitida: hoy en `America/Argentina/Buenos_Aires`; fechas explícitas reales `YYYY-MM-DD`. Para semanas/meses se usan límites `from`/`to` inclusivos en esa zona.
@@ -25,7 +27,7 @@ Tres tools en Trigger.dev, no en Hono: `registrarGasto`, `consultarGastos` y `co
 
 **Permiso de escritura por turno:** además de autenticar al propietario, el backend usa únicamente el texto del **último mensaje del usuario**, antes de llamar al modelo. Reconoce un conjunto conservador de comienzos explícitos: «Gasté 3500 en café», «Pagué 2000», «Registrá un gasto…», «Anotá el gasto…» (alta) y «Corregí el/ese gasto…» (corrección); también «Ese café era2500,no3500», siempre desambiguando el registro antes de corregir. Normaliza mayúsculas y acentos. Alta no autoriza corrección, ni viceversa. El permiso congelado viaja solo por contexto del servidor; se filtran las tools ofrecidas y cada ejecutor vuelve a comprobarlo antes de acceder a la base.
 
-«Cuánto gasté», hipótesis, ejemplos entre comillas, preguntas, mensajes con enlaces o varias líneas, negativas y un **«sí» aislado** no habilitan escrituras. Ni páginas web/resultados de tools, ni respuestas del asistente, historial anterior, `clientData` o argumentos del modelo pueden conceder el permiso. Para frases ambiguas/no reconocidas, el agente pide una nueva directiva explícita como «Registrá el gasto de 3500 en café» o «Corregí el gasto…» sin citas ni enlaces. No es comprensión general del lenguaje ni una garantía sobre cada dato elegido por el modelo: es una barrera determinista por acción, con falsos negativos deliberados. Las consultas de gastos y las tools web configuradas siguen disponibles sin permiso de escritura.
+«Cuánto gasté», hipótesis, ejemplos entre comillas, preguntas, mensajes con enlaces o varias líneas, negativas y un **«sí» aislado** no habilitan escrituras. Ni páginas web/resultados de tools, ni respuestas del asistente, historial anterior, `clientData` o argumentos del modelo pueden conceder el permiso. Para frases ambiguas/no reconocidas, el agente pide una nueva directiva explícita como «Registrá el gasto de 3500 en café» o «Corregí el gasto…» sin citas ni enlaces. No es comprensión general del lenguaje ni una garantía sobre cada dato elegido por el modelo: es una barrera determinista por acción, con falsos negativos deliberados. Las consultas de gastos (si están habilitados) y las tools web configuradas siguen disponibles sin permiso de escritura.
 
 La conversión usa la media aritmética exacta de dos o tres portales comparables del **dólar oficial vendedor**, todos de la misma fecha: DolarAPI, fuente `Oficial` de Bluelytics y ArgentinaDatos. Si no alcanza evidencia del día del gasto se busca la última fecha anterior disponible y se indica que **no es la fecha del gasto**; nunca se usa una fecha posterior. Con menos de dos cotizaciones válidas se guarda USD con conversión pendiente, sin fabricar ARS. Se conservan importe/moneda original, ARS, fecha, media y evidencia con fuentes y observación. Cambiar importe/moneda/fecha vuelve a consultar la conversión con los campos finales; cambiar solo descripción/categoría conserva la evidencia.
 
@@ -84,7 +86,8 @@ Límites documentados:
 | `TELEGRAM_BOT_TOKEN` | Entorno de Trigger.dev | Token del bot (@BotFather). |
 | `OPENAI_API_KEY` | Entorno de Trigger.dev | API key de OpenAI; la lee `@ai-sdk/openai`. |
 | `AI_MODEL` | Entorno de Trigger.dev | Opcional. Por defecto `gpt-5-nano`. |
-| `TELEGRAM_OWNER_ID` | Entorno de Trigger.dev | ID numérico positivo `from.id` del único propietario; requiere chat privado del mismo ID. Necesario para gastos. |
+| `TELEGRAM_OWNER_ID` | Entorno de Trigger.dev | ID numérico positivo `from.id` del único propietario; requiere chat privado del mismo ID. Necesario para gastos y obligatorio para Production privado, incluso con gastos desactivados. |
+| `EXPENSES_ENABLED` | Entorno de Trigger.dev | Opcional: omitido conserva DB + propietario; solo `true` exacto permite gastos, cualquier otro valor presente los desactiva. Production bot + Firecrawl: `false`. |
 | `DATABASE_URL` | Entorno de Trigger.dev | Conexión Postgres para gastos; necesaria junto al propietario. Conexión perezosa, sin migraciones automáticas. Nunca publicar el valor. |
 | `FIRECRAWL_API_KEY` | `.env` local (Development) / variables de Trigger.dev (Production) | Habilita las consultas web; opcional para conversar sin web. No configurar ni sincronizar en Railway. |
 | `TELEGRAM_WEBHOOK_SECRET` | Local / tu terminal | Secreto de firma del endpoint `telegram`, también enviado a Telegram como `secret_token`. |
@@ -93,6 +96,10 @@ Límites documentados:
 - `TELEGRAM_WEBHOOK_SECRET`: 1–256 caracteres, solo `A-Z a-z 0-9 _ -` (lo exige Telegram).
 - Railway ya no necesita `TELEGRAM_*` ni `OPENAI_API_KEY`. Nunca sincronices `TRIGGER_SECRET_KEY` a Railway (ver `AGENTS.md`): la clave del `.env` local es la de Development.
 - No subas valores reales al repo.
+
+### Production: bot + Firecrawl, gastos desactivados
+
+Configurar en Trigger.dev Production `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `FIRECRAWL_API_KEY`, un `TELEGRAM_OWNER_ID` válido del usuario (no del bot) y explícitamente **`EXPENSES_ENABLED=false`**; `AI_MODEL` es opcional. El propietario sigue siendo obligatorio para este despliegue privado aunque no haya gastos. `DATABASE_URL` no es necesaria para bot/Firecrawl: si ya existe, conservarla; no borrar tampoco el propietario. Este modo no requiere ni autoriza migraciones, activación financiera o acceso al ledger. Deploy y cambio de webhook son pasos separados, pendientes de readiness y verificación de permisos; esta receta no prueba capacidad Production ni modifica la restricción histórica indicada abajo.
 
 ## Registrar el webhook en Telegram
 

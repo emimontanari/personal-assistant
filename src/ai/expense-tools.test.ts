@@ -6,14 +6,14 @@ import { drizzle } from 'drizzle-orm/pglite'
 import { asSchema } from 'ai'
 import { createExpenseRepository } from '../expenses/repository.js'
 import { convertUsdToArs } from '../fx/index.js'
-import { createExpenseTools, type ExpenseRuntime } from './expense-tools.js'
+import { createExpenseTools, expensesAvailable, expenseRuntime, type ExpenseEnv, type ExpenseRuntime } from './expense-tools.js'
 
 async function fixture(t: { after(fn: () => Promise<void>): void }, pending = false, portals = 3) {
   const db = new PGlite(); t.after(() => db.close())
   await db.exec(await readFile(new URL('../../drizzle/0000_personal_expenses.sql', import.meta.url), 'utf8'))
   const repository = createExpenseRepository(drizzle(db))
   let fxCalls = 0
-  const env = { TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'configured-test-only' }
+  const env: ExpenseEnv = { TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'configured-test-only' }
   const now = () => new Date('2024-03-02T01:00:00Z')
   const runtime: ExpenseRuntime = { getEnv: () => env, getRepository: () => repository,
     convert: async (amount, date, options) => {
@@ -41,7 +41,7 @@ test('expense schemas are closed root objects without model identity or rates', 
   for (const tool of Object.values(f.tools)) {
     const schema = await asSchema(tool.inputSchema).jsonSchema
     assert.equal(schema.type, 'object'); assert.equal(schema.additionalProperties, false)
-    for (const forbidden of ['ownerId', 'sourceKey', 'runId', 'rates', 'portalURLs', 'capability', 'permission', 'permissions']) assert.ok(!JSON.stringify(schema).includes(forbidden))
+    for (const forbidden of ['ownerId', 'sourceKey', 'runId', 'rates', 'portalURLs', 'capability', 'permission', 'permissions', 'EXPENSES_ENABLED', 'expensesEnabled']) assert.ok(!JSON.stringify(schema).includes(forbidden))
   }
 })
 
@@ -143,6 +143,45 @@ test('write permissions are action-specific and enforced inside execute without 
   assert.deepEqual(await f.repository.revisions({ ownerId: '555', id: saved.id }), audit)
   const readContext = Object.freeze({ ...f.context, permission: 'read' })
   assert.equal((await tools.consultarGastos.execute!({}, { context: readContext, messages: [], toolCallId: 'read' } as never) as any).status, 'ok')
+})
+
+test('provided non-true expense flags disable availability', () => {
+  for (const EXPENSES_ENABLED of ['false', '0', '', 'TRUE', ' true ', 'typo']) {
+    assert.equal(expensesAvailable({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test', EXPENSES_ENABLED }, '555'), false)
+  }
+})
+
+test('expense flag is exact, server-only and revalidated after context creation for all tools', async t => {
+  const f = await fixture(t)
+  const seed = { record: await f.repository.register({ ownerId: '555', sourceKey: 'seed', description: 'seed', amount: '1', currency: 'ARS', expenseDate: '2024-03-01' }) }
+  const before = await f.repository.list({ ownerId: '555' })
+  const audit = await f.repository.revisions({ ownerId: '555', id: seed.record.id })
+  let repositoryCalls = 0
+  f.runtime.getRepository = () => { repositoryCalls++; return f.repository }
+  const previous = process.env.EXPENSES_ENABLED
+  t.after(async () => { if (previous === undefined) delete process.env.EXPENSES_ENABLED; else process.env.EXPENSES_ENABLED = previous })
+  for (const value of ['false', '0', '', 'TRUE', ' true ', 'typo']) {
+    process.env.EXPENSES_ENABLED = value
+    f.env.EXPENSES_ENABLED = value
+    for (const [name, input] of [
+      ['registrarGasto', { description: 'blocked', amount: '100', currency: 'USD' }],
+      ['consultarGastos', {}],
+      ['corregirGasto', { id: seed.record.id, expectedVersion: 1, patch: { amount: '999', currency: 'USD' } }],
+    ] as const) assert.deepEqual(await f.execute(name, input), { status: 'unconfigured', message: 'Gasto no confirmado: unconfigured.' })
+  }
+  // The production reader must read fresh server environment, not cache it.
+  assert.equal(expenseRuntime.getEnv().EXPENSES_ENABLED, 'typo')
+  assert.equal(repositoryCalls, 0); assert.equal(f.fxCalls(), 0)
+  assert.deepEqual(await f.repository.list({ ownerId: '555' }), before)
+  assert.deepEqual(await f.repository.revisions({ ownerId: '555', id: seed.record.id }), audit)
+  for (const value of [undefined, 'true']) {
+    f.env.EXPENSES_ENABLED = value
+    assert.equal(expensesAvailable(f.env, '555'), true)
+    assert.equal(expensesAvailable(f.env, 'other'), false)
+    assert.equal(expensesAvailable({ ...f.env, DATABASE_URL: undefined }, '555'), false)
+    assert.equal(expensesAvailable({ ...f.env, TELEGRAM_OWNER_ID: 'invalid' }, '555'), false)
+    assert.equal((await f.execute('consultarGastos', {})).status, 'ok')
+  }
 })
 
 test('repository errors are sanitized without returning successful records', async t => {

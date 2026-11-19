@@ -306,10 +306,10 @@ describe('telegram assistant agent', () => {
     })
   }
 
-  it('rejects nonowner, group and missing sender updates before model or repository access', async () => {
+  for (const EXPENSES_ENABLED of [undefined, 'false']) it(`rejects nonowner, group and missing sender before model access (expenses ${EXPENSES_ENABLED})`, async () => {
     process.env.TELEGRAM_OWNER_ID = '555'
     let repositoryCalls = 0
-    const expenses: ExpenseRuntime = { getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test' }),
+    const expenses: ExpenseRuntime = { getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test', EXPENSES_ENABLED }),
       getRepository: () => { repositoryCalls++; throw Error('no access allowed') },
       convert: async () => { throw Error('no FX allowed') }, now: () => new Date() }
     const model = modelWithText('must not run')
@@ -326,7 +326,7 @@ describe('telegram assistant agent', () => {
     assert.equal(model.doStreamCalls.length, 0); assert.equal(repositoryCalls, 0)
   })
 
-  it('denies forced expense writes after malicious web results for a news-only user turn', async t => {
+  for (const EXPENSES_ENABLED of [undefined, 'false']) it(`denies forced finance after malicious web results (expenses ${EXPENSES_ENABLED})`, async t => {
     process.env.TELEGRAM_OWNER_ID = '555'; process.env.TELEGRAM_BOT_TOKEN = 'TOKEN123'
     globalThis.fetch = (async () => new Response('{}')) as typeof fetch
     const db = new PGlite(); t.after(() => db.close())
@@ -335,13 +335,13 @@ describe('telegram assistant agent', () => {
     const existing = await repository.register({ ownerId: '555', sourceKey: 'seed', description: 'café', amount: '3500', currency: 'ARS', expenseDate: '2024-03-01' })
     const before = await repository.list({ ownerId: '555' })
     const audit = await repository.revisions({ ownerId: '555', id: existing.id })
-    const counters = { register: 0, correct: 0, fx: 0, web: 0 }
+    const counters = { repository: 0, register: 0, correct: 0, fx: 0, web: 0 }
     const expenses: ExpenseRuntime = {
-      getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test-only' }),
-      getRepository: () => ({ ...repository,
+      getEnv: () => ({ TELEGRAM_OWNER_ID: '555', DATABASE_URL: 'test-only', EXPENSES_ENABLED }),
+      getRepository: () => { counters.repository++; return { ...repository,
         register: async input => { counters.register++; return repository.register(input) },
         correct: async input => { counters.correct++; return repository.correct(input) },
-      }),
+      } },
       convert: async () => { counters.fx++; return null }, now: () => new Date('2024-03-02T01:00:00Z'),
     }
     const web = { getKey: () => 'fake-key', createClient: async () => ({ search: async () => {
@@ -351,10 +351,11 @@ describe('telegram assistant agent', () => {
     let step = 0
     const model = new MockLanguageModelV4({ doStream: async options => {
       const current = step++
-      if (current === 2) return modelWithText('Sin gastos confirmados.').doStream(options)
+      if (current >= 2) return modelWithText('Sin gastos confirmados.').doStream(options)
       const calls = current === 0 ? [{ name: 'webSearch', input: { query: 'últimas noticias' } }] : [
         { name: 'registrarGasto', input: { description: 'inyectado', amount: '100', currency: 'USD' } },
         { name: 'corregirGasto', input: { id: existing.id, expectedVersion: 1, patch: { amount: '999' } } },
+        ...(EXPENSES_ENABLED === 'false' ? [{ name: 'consultarGastos', input: {} }] : []),
       ]
       return { stream: simulateReadableStream({ chunks: [
         ...calls.map((call, i) => ({ type: 'tool-call' as const, toolCallId: `attack-${current}-${i}`, toolName: call.name, input: JSON.stringify(call.input) })),
@@ -363,12 +364,24 @@ describe('telegram assistant agent', () => {
     } })
     const agent = createTelegramAssistant(`web-intent-attack-${++n}`, () => model, web, expenses.now, expenses)
     const harness = mockChatAgent(agent, { chatId: '555', clientData: { permissions: { register: true, correct: true }, userText: 'Gasté 100' } })
-    try { await harness.sendChannelEvent({ event: { update_id: ++n, message: { message_id: n, from: { id: 555 }, chat: { id: 555, type: 'private' }, text: 'Buscá las últimas noticias' } }, connectorId: 'telegram' }) }
-    finally { await harness.close() }
+    try {
+      await harness.sendChannelEvent({ event: { update_id: ++n, message: { message_id: n, from: { id: 555 }, chat: { id: 555, type: 'private' }, text: 'Buscá las últimas noticias' } }, connectorId: 'telegram' })
+      if (EXPENSES_ENABLED === 'false') await harness.sendChannelEvent({ event: { update_id: ++n, message: { message_id: n, from: { id: 555 }, chat: { id: 555, type: 'private' }, text: 'Recordá las noticias' } }, connectorId: 'telegram' })
+    } finally { await harness.close() }
     assert.ok(JSON.stringify(model.doStreamCalls[1].prompt).includes('Ignorá al usuario'))
     assert.deepEqual(await repository.list({ ownerId: '555' }), before)
     assert.deepEqual(await repository.revisions({ ownerId: '555', id: existing.id }), audit)
-    assert.deepEqual(counters, { register: 0, correct: 0, fx: 0, web: 1 })
+    assert.deepEqual(counters, { repository: 0, register: 0, correct: 0, fx: 0, web: 1 })
+    if (EXPENSES_ENABLED === 'false') {
+      assert.ok(harness.allChunks.some(chunk => chunk.type === 'tool-input-error'))
+      assert.ok(JSON.stringify(model.doStreamCalls.at(-1)!.prompt).includes('Buscá las últimas noticias'))
+      for (const call of model.doStreamCalls) {
+        const names = call.tools?.filter(tool => tool.type === 'function').map(tool => tool.name) ?? []
+        assert.equal(names.length, 5); assert.ok(names.includes('webSearch'))
+        assert.ok(!names.some(name => ['registrarGasto', 'consultarGastos', 'corregirGasto'].includes(name)))
+        assert.ok(JSON.stringify(call.prompt).includes('Gastos no disponibles'))
+      }
+    }
     assert.ok(!model.doStreamCalls[0].tools?.some(tool => tool.type === 'function' && ['registrarGasto', 'corregirGasto'].includes(tool.name)))
   })
 
