@@ -1,6 +1,6 @@
 # Telegram production
 Tracking-only bootstrap for hosted Trigger.dev Production bot and Firecrawl, with expenses disabled.
-The expense-disable guard is locally verified, pending independent verification; owner configuration, deployment, webhook switching, and closure remain pending.
+The expense-disable guard is committed and independently verified offline; owner configuration, deployment, webhook switching, and production readback remain pending.
 
 ## Specs
 
@@ -10,11 +10,11 @@ The expense-disable guard is locally verified, pending independent verification;
 
 ## Tasks
 
-- T5 — IN PROGRESS, SOURCE LOCALLY VERIFIED: minimal `EXPENSES_ENABLED` availability/executor guard and tests/docs locally verified in L3; pending independent T4 code-phase verification against the parent's frozen commit; route: guard implementation, commit: pending parent source-work-unit commit (S2, S3).
-- T1 — PENDING: complete readiness and candidate freeze after trusted Production owner configuration and verified expense-disable guard; read-only metadata probe reported in L2; route: readiness, commit: pending (S1–S3).
+- T5 — CODE DONE (`22a5f9e`): minimal `EXPENSES_ENABLED` availability/executor guard and tests/docs independently verified offline in L4; S2/S3 code MET, Production configuration still pending; route: guard implementation, commit: `22a5f9ef57ff3a5bbdad7f94c3494b0e2f444e80` (S2, S3).
+- T1 — BLOCKED: actual missing trusted Production `TELEGRAM_OWNER_ID` requires human Dashboard configuration, not a value sent in chat; Development owner is also absent; guard candidate is frozen and independently verified; route: readiness, commit: `22a5f9e` code candidate (S1–S3).
 - T2 — PENDING: after readiness and owner configuration, set Production `EXPENSES_ENABLED` to `false` through normal remote configuration and deploy the frozen bot/Firecrawl candidate using actual official cached CLI `4.8.5`, whose environment-scoped client enforces Production capability; route: production configuration/deployment, commit: pending or no source change (S1–S3).
 - T3 — PENDING: switch the Telegram webhook to the hosted production endpoint while preserving queued updates and the signing secret; route: webhook cutover, commit: pending or no source change (S1–S3).
-- T4 — PENDING: independently verify offline guard behavior against the frozen commit after the parent's source-work-unit commit, then separately verify production readback before closure; route: independent code verification followed by deployment readback, commit: pending or tracking-only closure (S1–S3).
+- T4 — OFFLINE PHASE MET, PRODUCTION READBACK PENDING: independent frozen-commit guard verification passed in L4; remote readback and closure remain pending T1–T3; route: independent code verification followed by deployment readback, commit: verified `22a5f9e`, closure tracking pending (S1–S3).
 
 ## Log
 
@@ -62,3 +62,14 @@ Engineering constraints and parent-reported context, not additional Specs or new
 - Parent reports native ASSESS of the uncommitted candidate was unavailable because untracked files required selection. No INSPECT or START occurred and no native budget opened. The parent owns retrying ASSESS on the correct committed range excluding `dist/`; this is not a review disposition. Risk item 2 remains the guard/security boundary and item 5 remains Production deployment.
 - No remote configuration, owner configuration, migration, deployment, webhook, or database changes occurred. S1 is not deployed; S2 has a locally verified code guard but awaits Production `EXPENSES_ENABLED=false`; S3 still awaits the missing trusted Production `TELEGRAM_OWNER_ID`, configured by the human through the Dashboard without sending its value in chat. No new generic consent is required. T4's independent code phase must follow the parent's frozen commit; later deployment readback remains separate and unperformed.
 - This tracking-only update preserves Specs, exact human quotes, all pre-existing source changes, `dist/`, authentication staging, and runtime helpers. No secrets, owner values, or URLs are recorded; no remote actions or commit are performed.
+
+### L4 — Parent-reported independent frozen-candidate verification
+
+- Independent verifier `mwnhykm6-1k-lzuv` verified candidate `22a5f9ef57ff3a5bbdad7f94c3494b0e2f444e80` against baseline `72de354b1810a8c6fb575fc1029710c7ce5d6d1c`. Mandatory preparation was ready on its first attempt: 15,362 files, 235,872,526 bytes, matching manifest. These are parent-supplied results, not commands rerun by this tracking writer.
+- Isolated `npm test`: 145/145 passed, zero failures or skips, exit `0`; both TypeScript checks exited `0`; Git diff/drift checks exited `0`. Three extra independent probes passed: false/malformed expense flags and direct use of old contexts caused no DB/FX activity or public SQL hash changes; legacy unset/true pipelines remained intact; wrong-user/group requests were blocked before model execution, with web and history preserved. Exact probe, TypeScript, and diff/drift command lines were not supplied.
+- A retrospective baseline expense-module probe returned one pass and one failure, reproducing the missing flag. This is baseline evidence, not independently observed preimplementation RED. One verifier mock-fixture usage-metadata correction preceded GREEN; no source correction occurred.
+- No remote authentication, configuration, live database, deployment, webhook, or model calls occurred during verification. Actual migration execution was confined to isolated PGlite. Local worker job 7 remains stopped; no new local worker or cloud deployment was performed.
+- Parent reports committed native ASSESS against base `72de354`: 169 changed/authored lines across six paths in bounded work unit `22a5f9e`; native Medium plus agent-security risk item 2 yields high risk. Result: `reviewDue=false`, `under_budget`, `independentVerifier=true`; the independent-verifier requirement is now satisfied. Risk item 5 remains Production deployment. No native provider review is due; no START, consent, closure, or budget is invented. L3's initial untracked-assessment error remains historical. This is not an oversized cumulative branch-versus-main assessment.
+- T5 is CODE DONE and S2/S3 code requirements are MET; T4 offline phase is MET. S1 is not deployed, and production acceptance remains incomplete. T1 is blocked on the actual missing trusted Production owner: the parent must ask the human to add `TELEGRAM_OWNER_ID` through the Trigger Dashboard's Production environment, using their numeric Telegram USER ID, not a bot ID, and confirm completion without sharing its value in chat. After that prerequisite, already-authorized deployment continuation resumes automatically; no new generic scope approval is needed.
+- Readiness metadata remains: all three required API keys are present and `DATABASE_URL` is present and must be preserved. Production `EXPENSES_ENABLED=false` is NOT yet set or remotely verified; the release executor must set it before deploying. Development owner is absent too. T2/T3 remain pending their dependencies, and T4 production readback remains pending. No secret, owner value, authentication URL, or actual endpoint URL is recorded.
+- This update changes only tracking status and evidence, preserving Specs, quotes, previous logs, `dist/`, authentication staging, runtime helpers, and all source. The parent owns committing this evidence; this writer performs no commit or remote action.
