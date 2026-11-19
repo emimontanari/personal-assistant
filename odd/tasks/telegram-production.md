@@ -1,20 +1,21 @@
-# Telegram production
-Tracking-only bootstrap for hosted Trigger.dev Production bot and Firecrawl, with expenses disabled.
-The expense-disable guard is committed and independently verified offline; owner configuration, deployment, webhook switching, and production readback remain pending.
+# Telegram production — local continuation
+Production is shelved by the latest human disposition; current delivery is parent-owned commit and push of the existing feature branch.
+The independently verified expense-disable guard is retained; local job 7 remains stopped, and no deployment or worker restart is authorized.
 
 ## Specs
 
-- **S1 — Hosted operation.** User request: "bueno lo detengamos eso tiene que estar corriendo deploy no en mi px". Run the bot hosted rather than depending on the user's PC.
+- **S1 — Local continuation and branch publication.** Latest user request: "va a seguir siendo local, hagamos commiy push y todo". Keep the local hosting choice and commit/push the current feature branch; Production is shelved. This supersedes the earlier hosted-operation request, "bueno lo detengamos eso tiene que estar corriendo deploy no en mi px", and its Production selection retained in S2 and L1 as history. It does not authorize deployment, a worker restart, pushing main, merging, or a PR.
 - **S2 — Accepted production scope.** Selected UI label: "Bot y Firecrawl; gastos desactivados". Accepted UI description: "Alojar el bot sin depender de tu PC, sin aplicar la migración ni activar escrituras de gastos." These are UI acceptance evidence, not user-composed prose.
 - **S3 — Existing sole-user scope.** Carry forward `odd/tasks/personal-expenses.md` S1: "Es mi asistente personal lo voy a utilizar yo solamente". This preserves the existing personal-owner privacy requirement; it is not a new production request.
 
 ## Tasks
 
-- T5 — CODE DONE (`22a5f9e`): minimal `EXPENSES_ENABLED` availability/executor guard and tests/docs independently verified offline in L4; S2/S3 code MET, Production configuration still pending; route: guard implementation, commit: `22a5f9ef57ff3a5bbdad7f94c3494b0e2f444e80` (S2, S3).
-- T1 — BLOCKED: actual missing trusted Production `TELEGRAM_OWNER_ID` requires human Dashboard configuration, not a value sent in chat; Development owner is also absent; guard candidate is frozen and independently verified; route: readiness, commit: `22a5f9e` code candidate (S1–S3).
-- T2 — PENDING: after readiness and owner configuration, set Production `EXPENSES_ENABLED` to `false` through normal remote configuration and deploy the frozen bot/Firecrawl candidate using actual official cached CLI `4.8.5`, whose environment-scoped client enforces Production capability; route: production configuration/deployment, commit: pending or no source change (S1–S3).
-- T3 — PENDING: switch the Telegram webhook to the hosted production endpoint while preserving queued updates and the signing secret; route: webhook cutover, commit: pending or no source change (S1–S3).
-- T4 — OFFLINE PHASE MET, PRODUCTION READBACK PENDING: independent frozen-commit guard verification passed in L4; remote readback and closure remain pending T1–T3; route: independent code verification followed by deployment readback, commit: verified `22a5f9e`, closure tracking pending (S1–S3).
+- T5 — DONE (`22a5f9e`): minimal `EXPENSES_ENABLED` availability/executor guard and tests/docs independently verified offline in L4; S2/S3 code MET and retained without activation or rollback; route: guard implementation, commit: `22a5f9ef57ff3a5bbdad7f94c3494b0e2f444e80` (S2, S3).
+- T1 — DROPPED: Production readiness/configuration shelved by the human's local disposition in L5, not completed; route: former Production readiness, commit: no further work (S1–S3).
+- T2 — DROPPED: Production configuration/deployment shelved by L5, never performed; route: former Production release, commit: no further work (S1–S3).
+- T3 — DROPPED: Production webhook cutover shelved by L5, never performed; route: former webhook cutover, commit: no further work (S1–S3).
+- T4 — DROPPED: Production readback/closure shelved by L5, never completed; offline code proof remains valid: 145 tests and three independent probes in L4; route: former Production verification, commit: verified code `22a5f9e` (S1–S3).
+- T6 — IN PROGRESS: parent to commit this disposition and push `feat/telegram-production` to `origin` ordinarily, without force or staging `dist/`; source already committed through `cf158400df50658c41153c1aad841fbdb8e43ce8`, publication receipt pending observed push; route: parent-owned branch publication, commit: disposition pending (S1).
 
 ## Log
 
@@ -73,3 +74,14 @@ Engineering constraints and parent-reported context, not additional Specs or new
 - T5 is CODE DONE and S2/S3 code requirements are MET; T4 offline phase is MET. S1 is not deployed, and production acceptance remains incomplete. T1 is blocked on the actual missing trusted Production owner: the parent must ask the human to add `TELEGRAM_OWNER_ID` through the Trigger Dashboard's Production environment, using their numeric Telegram USER ID, not a bot ID, and confirm completion without sharing its value in chat. After that prerequisite, already-authorized deployment continuation resumes automatically; no new generic scope approval is needed.
 - Readiness metadata remains: all three required API keys are present and `DATABASE_URL` is present and must be preserved. Production `EXPENSES_ENABLED=false` is NOT yet set or remotely verified; the release executor must set it before deploying. Development owner is absent too. T2/T3 remain pending their dependencies, and T4 production readback remains pending. No secret, owner value, authentication URL, or actual endpoint URL is recorded.
 - This update changes only tracking status and evidence, preserving Specs, quotes, previous logs, `dist/`, authentication staging, runtime helpers, and all source. The parent owns committing this evidence; this writer performs no commit or remote action.
+
+### L5 — Human local disposition and bounded branch publication
+
+Latest human request, verbatim:
+> va a seguir siendo local, hagamos commiy push y todo
+
+- The parent interprets this as keeping local hosting, shelving Production now, and explicitly authorizing commit and ordinary non-force push of the current `feat/telegram-production` branch to `origin`. Generic "y todo" does not authorize pushing main, merging, a PR, deployment, or restarting a worker. T6 is in progress; no push success or publication receipt is claimed. The parent may record the receipt only after observing the remote push.
+- This disposition supersedes the earlier hosted request and Production UI choice as an active delivery goal, without deleting their exact historical evidence. S1 now tracks local continuation/publication. S2's former Production expenses-off goal is historical: the source guard remains retained and independently verified, with no activation or feature rollback requested. S3's existing sole-owner privacy remains unchanged.
+- T1–T4 are DROPPED because Production is shelved, never marked done as Production work. T4's already observed offline evidence remains valid: 145/145 tests and three independent probes; T5 remains DONE at `22a5f9e`. No Production configuration, migration, deployment, or webhook change occurred. Former owner/configuration prerequisites do not require action for this shelved Production route.
+- Parent-reported source is already committed through `cf158400df50658c41153c1aad841fbdb8e43ce8`; working-tree inspection before this update showed only pre-existing untracked `dist/`. The parent owns committing this documentation and pushing the branch; exclude `dist/` from staging. The bounded guard work unit remains `22a5f9e`, 169 authored lines against base `72de354`; these bounded documentation notes do not redefine the entire stacked branch versus main as that work unit.
+- Local job 7 remains stopped under the earlier explicit stop. A local hosting choice is not evidence that the bot is running locally; no new worker restart or cloud deployment has occurred or is authorized here. No runtime, source, environment, DB schema/data, Railway, or `TRIGGER_SECRET_KEY` changes; no secret or `.env` reads, owner values, authentication URLs, or endpoint URLs. Preserve `dist/`, authentication staging, runtime helpers, and all existing source. This writer changes only this document and performs no Git commit, push, or remote action.
