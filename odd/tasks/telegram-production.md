@@ -1,5 +1,5 @@
 # Telegram production — local continuation
-Production is shelved by the latest human disposition; current delivery is parent-owned commit and push of the existing feature branch.
+Production is shelved by the latest human disposition; the local-delivery feature branch is published, with no open feature tasks.
 The independently verified expense-disable guard is retained; local job 7 remains stopped, and no deployment or worker restart is authorized.
 
 ## Specs
@@ -15,7 +15,7 @@ The independently verified expense-disable guard is retained; local job 7 remain
 - T2 — DROPPED: Production configuration/deployment shelved by L5, never performed; route: former Production release, commit: no further work (S1–S3).
 - T3 — DROPPED: Production webhook cutover shelved by L5, never performed; route: former webhook cutover, commit: no further work (S1–S3).
 - T4 — DROPPED: Production readback/closure shelved by L5, never completed; offline code proof remains valid: 145 tests and three independent probes in L4; route: former Production verification, commit: verified code `22a5f9e` (S1–S3).
-- T6 — IN PROGRESS: parent to commit this disposition and push `feat/telegram-production` to `origin` ordinarily, without force or staging `dist/`; source already committed through `cf158400df50658c41153c1aad841fbdb8e43ce8`, publication receipt pending observed push; route: parent-owned branch publication, commit: disposition pending (S1).
+- T6 — DONE: parent published `feat/telegram-production` to `origin/feat/telegram-production` with upstream tracking and synchronized refs at `2913b30b4be3f85f8840bf7b455208c4c65d87cb`; ordinary push succeeded in L6, excluding `dist/`; route: parent-owned branch publication, commit: `2913b30b4be3f85f8840bf7b455208c4c65d87cb` (S1).
 
 ## Log
 
@@ -85,3 +85,12 @@ Latest human request, verbatim:
 - T1–T4 are DROPPED because Production is shelved, never marked done as Production work. T4's already observed offline evidence remains valid: 145/145 tests and three independent probes; T5 remains DONE at `22a5f9e`. No Production configuration, migration, deployment, or webhook change occurred. Former owner/configuration prerequisites do not require action for this shelved Production route.
 - Parent-reported source is already committed through `cf158400df50658c41153c1aad841fbdb8e43ce8`; working-tree inspection before this update showed only pre-existing untracked `dist/`. The parent owns committing this documentation and pushing the branch; exclude `dist/` from staging. The bounded guard work unit remains `22a5f9e`, 169 authored lines against base `72de354`; these bounded documentation notes do not redefine the entire stacked branch versus main as that work unit.
 - Local job 7 remains stopped under the earlier explicit stop. A local hosting choice is not evidence that the bot is running locally; no new worker restart or cloud deployment has occurred or is authorized here. No runtime, source, environment, DB schema/data, Railway, or `TRIGGER_SECRET_KEY` changes; no secret or `.env` reads, owner values, authentication URLs, or endpoint URLs. Preserve `dist/`, authentication staging, runtime helpers, and all existing source. This writer changes only this document and performs no Git commit, push, or remote action.
+
+### L6 — Parent-observed successful branch publication
+
+- Parent committed `2913b30b4be3f85f8840bf7b455208c4c65d87cb`, `docs(odd): defer production and record local delivery scope`. Plain `git push --set-upstream origin feat/telegram-production` exited `0`, creating `origin/feat/telegram-production` in GitHub repository `emimontanari/personal-assistant` and establishing upstream tracking. No force push occurred.
+- Parent readback `git rev-parse HEAD origin/feat/telegram-production` returned `2913b30b4be3f85f8840bf7b455208c4c65d87cb` for both refs. `git rev-list --left-right --count HEAD...@{upstream}` returned `0 0`. Parent status showed only pre-existing `?? dist/`; it was not staged. These are parent-observed publication results, not remote commands rerun by this tracking writer.
+- An initial `bash_background` delivery wrapper refused before execution: this was not a push failure or authority denial. The separate plain push succeeded without disabling native guards.
+- T6 is DONE on the actual first-push receipt above. T1–T4 remain DROPPED under the local disposition; T5 remains DONE at `22a5f9e`, with unchanged independent evidence of 145 passing tests and three probes. No feature tasks remain open. The bounded guard work unit remains 169 authored lines against `72de354`, not the whole outgoing branch's line count.
+- No PR, merge, deployment, environment change, webhook change, migration, or worker restart occurred. Local job 7 is STILL STOPPED; branch publication and local hosting choice do not mean the bot is running locally. No secrets, owner values, authentication URLs, or raw endpoint/remote URLs are recorded.
+- The parent still plans to commit this receipt as documentation-only metadata and publish that final tracking update with an ordinary push. That future metadata publication is not yet observed and is not claimed successful; it does not reopen completed feature publication T6. This writer changes only this document, preserves all source and pre-existing `dist/`, and performs no commit, push, or remote action.
